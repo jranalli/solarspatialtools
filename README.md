@@ -33,6 +33,8 @@ Some demonstration codes and jupyter notebooks to demonstrate usage of the
 tools.
 
 ### Function libraries
+```solartoolbox (root)```
+General tools or wrappers for other functions.
 
 ```cmv```  
 Functions for computing the cloud motion vector from a distributed irradiance 
@@ -101,6 +103,8 @@ the site id (HOPE - integer, NRCAN - string).
 ## Significant Changelog
 ##### Version 0.2
 First public release
+##### Version 0.2.1
+Add wrapper for `pvlib.clearsky_index` to handle pandas type
 
 ## Author
 Joe Ranalli  
