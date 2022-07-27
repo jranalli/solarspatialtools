@@ -105,6 +105,9 @@ the site id (HOPE - integer, NRCAN - string).
 First public release
 ##### Version 0.2.1
 Add wrapper for `pvlib.clearsky_index` to handle pandas type
+##### Version 0.2.2
+Change input to camfilter to handle references that don't coincide with the 
+site itself. This change breaks code!
 
 ## Author
 Joe Ranalli  

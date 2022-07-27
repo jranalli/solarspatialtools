@@ -333,7 +333,7 @@ def apply_filter(input_tsig, comp_filt):
     return filtered_sig
 
 
-def get_camfilter(positions, cloud_speed, cloud_dir, ref_id, dx=1, **kwargs):
+def get_camfilter(positions, cloud_speed, cloud_dir, ref_position, dx=1, **kwargs):
     """
     Compute the filter for the CAM model
 
@@ -354,8 +354,8 @@ def get_camfilter(positions, cloud_speed, cloud_dir, ref_id, dx=1, **kwargs):
         A tuple (dx,dy) representing the cloud motion direction. Will be
         converted to a unit vector, so length is not important.
 
-    ref_id : int
-        The positional id for the reference site within positions.
+    ref_position : pandas.DataFrame
+        A subset of positions that represents the position of the reference.
 
     dx : numeric
         The spatial spacing that should be used in representing the plant.
@@ -377,9 +377,14 @@ def get_camfilter(positions, cloud_speed, cloud_dir, ref_id, dx=1, **kwargs):
         pos_utm = spatial.latlon2utm(positions['lat'], positions['lon'])
     except KeyError:
         pos_utm = positions
+    try:
+        ref_utm = spatial.latlon2utm(ref_position['lat'], ref_position['lon'])
+        ref_utm = pd.Series(ref_utm, index=['E', 'N', 'zone'])
+    except KeyError:
+        ref_utm = ref_position
 
     pos_vecs = spatial.compute_vectors(pos_utm['E'], pos_utm['N'],
-                                       pos_utm.loc[ref_id][['E', 'N']])
+                                       ref_utm[['E', 'N']])
     pos_dists = spatial.project_vectors(pos_vecs, cloud_dir)
 
     plant, x_plant = get_1d_plant(pos_dists, dx=dx, **kwargs)

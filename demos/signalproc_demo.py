@@ -31,25 +31,27 @@ def main():
     # The reference site within the plant, and the plant subset (N-S)
     ref_id = 40
     plant_pts = [60, 79, 92, 43, 42, 40, 86, 7, 14, 70]
-
+    
     # ##### DATA SETUP ##### #
 
     # Read Data from HDF file
     pos = pd.read_hdf(fn, mode="r", key="latlon")
     ts = pd.read_hdf(fn, mode="r", key="data")
 
+    # Project them to UTM
+    pos_utm = spatial.latlon2utm(pos['lat'], pos['lon'])
     # Select just the points in the plant
     pos_sub = pos.loc[plant_pts]
-    # Project them to UTM
-    pos_sub_utm = spatial.latlon2utm(pos_sub['lat'], pos_sub['lon'])
+    pos_sub_utm = pos_utm.loc[plant_pts]
 
     # Downselect the time series to just the points in the plant, and just
     # the time window of interest.
-    ts_sub = ts.loc[twin][plant_pts]
+    ts_sub = ts.loc[twin]
 
     # Select the Input (reference) time series, and compute the Output
     # (aggregate time series)
     ts_in = ts_sub[ref_id]
+    ts_sub = ts_sub[plant_pts]
     ts_agg = ts_sub.sum(axis=1) / len(plant_pts)
 
     # Calculate the clear sky index for the time series (using PVLIB functions)
@@ -63,7 +65,7 @@ def main():
 
     # Apply the filter from the Cloud Advection Model
     camfilt = signalproc.get_camfilter(pos_sub_utm, cloud_speed,
-                                       cloud_dir, ref_id)
+                                       cloud_dir, pos_utm.loc[ref_id])
     ts_cam = signalproc.apply_filter(ts_in, camfilt)
     kt_cam = pvlib.irradiance.clearsky_index(ts_cam, cs_ghi)
 
