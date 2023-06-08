@@ -108,6 +108,8 @@ Add wrapper for `pvlib.clearsky_index` to handle pandas type
 ##### Version 0.2.2
 Change input to camfilter to handle references that don't coincide with the 
 site itself. This change breaks code!
+##### Version 0.2.3
+Add methods for calculating delay between signals to `signalproc`
 
 ## Author
 Joe Ranalli  
