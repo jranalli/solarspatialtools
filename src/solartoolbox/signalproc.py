@@ -2,9 +2,10 @@ import numpy as np
 import pandas as pd
 from scipy import signal
 from scipy.interpolate import interp1d
+from scipy.optimize import curve_fit
 import pvlib
 
-from solartoolbox import spatial
+from solartoolbox import spatial, stats
 
 
 # Library for Analyzing Time Series Transfer Functions
@@ -167,6 +168,157 @@ def interp_tf(new_freq, input_tf):
         interp_filt = pd.DataFrame(interp_filt, columns=input_tf.columns,
                                    index=new_freq)
     return interp_filt
+
+
+def tf_delay(tf, coh_limit=0.6, freq_limit=0.02, method='fit'):
+    """
+    Compute the delay based on the phase of a transfer function
+
+    Parameters
+    ----------
+    tf : pd.DataFrame
+        The transfer function, produced by signalproc.averaged_tf. Critically,
+        it needs to have columns of 'tf' and 'coh' in order to use the limit.
+    coh_limit : float
+        The coherence limit to use for filtering the phase. Set to None to
+        include all points.
+    freq_limit : float
+        The frequency limit to use for filtering the phase. Set to None to
+        include all points.
+    method : str
+        The method to use for computing the delay. Options are:
+            'diff' - unwrap phase and take derivative
+            'fit' - fit a line to the phase
+
+    Returns
+    -------
+    delay : float
+        The delay in seconds
+
+    """
+    try:
+        if coh_limit is None:
+            ix1 = np.ones_like(tf.index, dtype=bool)
+        else:
+            ix1 = tf['coh'] > coh_limit
+        if freq_limit is None:
+            ix2 = np.ones_like(tf.index, dtype=bool)
+        else:
+            ix2 = tf.index < freq_limit
+        ix = np.bitwise_and(ix1, ix2)
+    except KeyError:
+        from warnings import warn
+        warn('No coherence column found, using all points.')
+        ix = np.ones_like(tf.index, dtype=bool)
+
+    if method == 'diff':
+        # # Method 1: unwrap phase and take derivative
+        gd = -np.diff(np.unwrap(np.angle(tf)))/np.diff(tf.index)
+        gd = np.append(gd, gd[-1])
+        gd = gd/(2*np.pi)
+        avg_del = np.sum(gd * ix / np.sum(ix))
+        return avg_del, ix
+
+    # Method 2: curve fit the phase
+    elif method == 'fit':
+        def delay_fitter(x, delval):
+            """
+            Curve fit helper function for computing the group delay.
+            :param x: the transfer function frequency
+            :param delval: The 'real' phase to fit the group delay to
+            :return: the modeled phase
+            """
+            model = np.unwrap(np.angle(np.ones_like(x) *
+                                       np.exp(2 * np.pi * 1j * x * -delval)))
+            return model
+
+        try:
+            return curve_fit(delay_fitter, tf.index[ix],
+                             np.unwrap(np.angle(tf['tf'][ix])))[0], ix
+        except ValueError:
+            from warnings import warn
+            if not ix.any():
+                warn('Curve fit failed due to coherence limit. Returning NaN')
+                return np.nan, ix
+
+            else:
+                warn('Curve fit failed for unknown reason. Returning NaN')
+                return np.nan, ix
+
+    else:
+        raise ValueError(f'Invalid method: {method}')
+
+
+def xcorr_delay(ts_in, ts_out, scaling='coeff'):
+    """
+    Compute the delay between two timeseries using cross correlation.
+
+    Parameters
+    ----------
+    ts_in : pd.Series
+        The input timeseries. Requires that the index operate as datetime.
+    ts_out : pd.Series
+        The output timeseries
+    scaling : str
+        Type of scaling to use for cross correlation. Options are:
+
+        'energy' - scales by the energy of the autocorrelation of the input
+        'coeff' - scales the output to the correlation coefficient (always
+                  removes the mean from both signals)
+        'unbiased_energy' - similar to energy, but normalizes based on lag to
+                            account for the fewer points used in the
+                            convolution. Removes bias towards small lags.
+        'unbiased_coeff' - similar to coeff, but normalizes based on lag to
+                            account for the fewer points used in the
+                            convolution. Removes bias towards small lags.
+
+    Returns
+    -------
+    delay : float
+        Time lag between the two timeseries at the maximum value of the cross
+        correlation. Values are always integer multiples of the sampling period
+        as the max correlation values are limited to the discrete time steps.
+    corr : float
+        The peak value of the cross correlation at the identified delay.
+    """
+    # Method 3: Cross Correlation
+    xcorr_i, lags = stats.correlation(ts_in, ts_out, scaling)
+    dt = (ts_in.index[1] - ts_in.index[0]).total_seconds()
+    lags = lags * dt
+    peak_lag_index = xcorr_i.argmax()  # Index of peak correlation
+    delay = -lags[peak_lag_index]
+    return delay, xcorr_i[peak_lag_index]
+
+
+def apply_delay(tf, delay):
+    """
+    Apply a time delay to a transfer function. This is equivalent to rotating
+    the phase as a linear function of frequency.
+
+    To compare with a unity transfer function, consider:
+        apply_delay(tf['tf'] * 0 + 1, delay)
+
+    Parameters
+    ----------
+    tf : pd.DataFrame
+        The transfer function, produced by signalproc.averaged_tf. Critically,
+        it needs to have a column of 'tf' containing the complex valued
+        transfer function, and the index must contain the frequency in Hz.
+    delay : float
+        The delay to apply to the transfer function. Units are in seconds.
+
+    Returns
+    -------
+    A copy of the transfer function with the delay applied in rotating
+    the phase.
+    """
+
+    tf = tf.copy()
+
+    # Equation for rotating the phase by a delay
+    tf['tf'] = tf['tf'] * np.exp(2 * np.pi * 1j * tf.index * -delay)
+
+    return tf
 
 
 def get_1d_plant(centers, ref_center=0,
