@@ -53,6 +53,7 @@ class WindspeedData:
     pair_flag = None
     flag = None  # A data quality flag
     vectors = None
+    method_data = None  # A holder for method-specific data
 
 
 def _get_pairs(all_points, must_contain=None, replacement=True):
@@ -107,7 +108,7 @@ def _get_pairs(all_points, must_contain=None, replacement=True):
 
 
 def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
-                corr_scaling='coeff'):
+                corr_scaling='coeff', options={}):
     """
     Find Cloud Motion Vector based on clear sky index timeseries from a cluster
     of sensors using the method by Jamaly and Kleissl [1]. An alternate method
@@ -142,6 +143,14 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
         Scaling for correlation. Choices are 'energy' and 'coeff'. Coeff
         scaling automatically normalizes to the mean of the timeseries.
 
+    options : dict (default {})
+        Dictionary of detailed arguments for the methods.
+            Jamaly:
+                minvelocity : float (default 0 m/s)
+                    Minimum permissible pairwise velocity in m/s
+                maxvelocity : float (default 70 m/s)
+                    Maximum permissible pairwise velocity in m/s
+
     Returns
     -------
     cmv_vel : numeric
@@ -169,6 +178,38 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
     method = method.lower()
     if method not in methods:
         raise ValueError('Method must be one of: ' + str(methods) + '.')
+
+    # Validate options
+    if options is None:
+        options = {}
+    # Specify default options by method
+    if method == 'jamaly':
+        defaults = {'minvelocity': 0,  # m/s
+                    'maxvelocity': 70  # m/s (about 160 mph)
+                    }
+        method_out = {
+                    'error_index': None,  # The Error Index
+                    'velocity': None,  # Velocity for each pair
+                    'v60': None,  # 60th percentile velocity
+                    'v40': None,  # 40th percentile velocity
+                    'r_qc': [],  # Ratio of peak to mean xcorr
+                    'var_s': [],  # Variation ratio of signals [s0, s1]
+                      }
+    if method == 'gagne':
+        defaults = {}
+        method_out = {
+            'pcov': None,  # Covariance matrix from least squares
+        }
+
+    # Validate option keys are part of method
+    for key in options:
+        if key not in defaults:
+            raise ValueError(f'Invalid option for {method}: ' + str(key) + '.')
+
+    # Build out options with defaults if they're not specified
+    for key in defaults:
+        if key not in options:
+            options[key] = defaults[key]
 
     # Ignore some numpy printouts, we'll deal with them manually
     np.seterr(divide='ignore')
@@ -261,6 +302,7 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
             var_s_lim = 0.05  # TODO Justify Override Jamaly value
             var_s0 = 1 - np.nanmean(sig0) / np.nanmax(sig0)
             var_s1 = 1 - np.nanmean(sig1) / np.nanmax(sig1)
+            method_out['var_s'].append([var_s0, var_s1])
             if var_s0 < var_s_lim or var_s1 < var_s_lim:
                 pair_flags[pair_ind] = Flag.LOWVAR_S
                 continue
@@ -282,6 +324,7 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
             # Jamaly and Kleissl - require minimum lagged xcorr and minimum
             # cross correlation ratio
             r_qc = 1 - np.mean(xcorr_i) / np.max(xcorr_i)
+            method_out['r_qc'].append(r_qc)
             if np.max(xcorr_i) < 0.8 or r_qc < 0.8:
                 pair_flags[pair_ind] = Flag.LOWCORR
                 continue
@@ -289,8 +332,8 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
             # Jamaly and Kleissl distance limit is confusing; I modified here
             # Original appears to require that the max velocity be less than
             # 1 m/s I implement it as a literal velocity limit rather than dist
-            min_v = 0  # m/s (could be introduced)
-            max_v = 70  # m/s  (around 160 mph)
+            min_v = options['minvelocity']  # m/s (could be introduced)
+            max_v = options['maxvelocity']  # m/s (70 m/s, around 160 mph)
             max_lag_fraction = 1  # fraction of timeseries for max lag
             max_lag = np.abs(np.max(lags)) * max_lag_fraction  # max dt allowed
             if (delay[pair_ind] > max_lag or
@@ -364,6 +407,11 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
         if np.abs(err) > 0.4:  # Set flag if appropriate
             overall_flag = Flag.TREND
 
+        method_out['v60'] = v60
+        method_out['v40'] = v40
+        method_out['error_index'] = err
+        method_out['velocity'] = velocity
+
     elif method == 'gagne':
         # Function to apply least squares to
         def resid(p, lag, coeff_vecs):
@@ -374,6 +422,8 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
 
         [ax_opt, ay_opt], pcov = leastsq(resid, [1, 1],
                                          args=(delay_good, vectors_good))
+
+        method_out['pcov'] = pcov
 
         # Gagne 2018 equation 4
         vx = 1 / (ax_opt ** 2 + ay_opt ** 2) * ax_opt
@@ -403,5 +453,6 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
     outdata.corr_gain = corr_gain
     outdata.wind_angle = cmv_theta
     outdata.wind_speed = cmv_vel
+    outdata.method_data = method_out
 
     return cmv_vel, cmv_theta, outdata

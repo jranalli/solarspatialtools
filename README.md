@@ -110,12 +110,14 @@ Change input to camfilter to handle references that don't coincide with the
 site itself. This change breaks code!
 ##### Version 0.2.3
 Add methods for calculating delay between signals to `signalproc`
+##### Version 0.2.4
+Add some additional options to CMV code
 
 ## Author
 Joe Ranalli  
 Associate Professor of Engineering  
 Penn State Hazleton  
 jar339@psu.edu  
-http://personal.psu.edu/jar339/
+https://jranalli.github.io/
 
 
