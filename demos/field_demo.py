@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 
 from solartoolbox import spatial, field
 
-
 # #############
 # # READ DATA #
 # #############
@@ -12,11 +11,11 @@ from solartoolbox import spatial, field
 # This is the name of the default datafile
 # It contains the definition of the plant layout as well as
 # two time periods A) and B) that represent two different CMV periods
-datafile = "data/sample_field.h5"
+datafile = "data/sample_plant_2.h5"
 
 # Input the CMVs, see cmv_demo.py for examples of how to calculate these
-cmv_a = spatial.pol2rect(9.515372409962954, 0.6196401023982533)
-cmv_b = spatial.pol2rect(8.486245566393151, 2.177365219628146)
+cmv_a = spatial.pol2rect(9.52, 0.62)
+cmv_b = spatial.pol2rect(8.47, 2.17)
 
 # pos_utm is a pandas DataFrame. The index is the combiner ID, and the columns
 # 'E' and 'N' specify the combiner position East and North in a UTM-like
