@@ -1,5 +1,5 @@
 import pytest
-from pytest import approx
+from pytest import approx, raises
 
 import numpy as np
 import numpy.testing as npt
@@ -121,6 +121,11 @@ class TestCorrelation:
         imax = np.argmax(c)
         assert -lag[imax]*(t[1]-t[0]) == approx(dly)  # -lag * dt == t_shift
 
+    def test_correlation_illegal(self, corr_data):
+        d, t, x1, x2, dly = corr_data
+        with raises(ValueError):
+            c, lag = stats.correlation(x1, x2, scaling="illegal")
+
 
 class TestQuantile:
     """
@@ -195,6 +200,11 @@ class TestVariabilityMetrics:
         assert stats.variability_index(data, cs, moving_avg_tau=1, norm=False)\
                == approx((5937 + 2 * np.sqrt(2)) / 5939)
 
+    def test_variability_index_illegal(self, variability_score_data):
+        data, cs = variability_score_data
+        with raises(TypeError):
+            stats.variability_index(data.values, cs)
+
     def test_variability_index_movingavg(self, variability_score_data):
         data, cs = variability_score_data
         assert stats.variability_index(data, cs, moving_avg_tau=2, norm=False)\
@@ -211,6 +221,12 @@ class TestVariabilityMetrics:
 
         assert stats.darr(data, moving_avg=False, pct=False) == approx(2)
         assert stats.darr(data, pct=False) == approx(2)
+
+    def test_darr_illegal(self, darr_data):
+        data = darr_data
+        data.iloc[2] = 6
+        with raises(TypeError):
+            stats.darr(data.values, moving_avg=False, pct=False)
 
     def test_darr_pct(self, darr_data):
         data = darr_data
@@ -230,6 +246,14 @@ class TestVariabilityMetrics:
 
     def test_variability_score_basic(self, ghi):
         vs = stats.variability_score(ghi, tau=1, moving_avg=False, pct=False)
+        assert vs == approx(1.2)  # 2 * 50% chance of being greater
+
+    def test_variability_score_pandas(self, ghi):
+        vs = stats.variability_score(pd.Series(ghi), tau=1,
+                                     moving_avg=False, pct=False)
+        assert vs == approx(1.2)  # 2 * 50% chance of being greater
+        vs = stats.variability_score(pd.DataFrame(ghi), tau=1,
+                                     moving_avg=False, pct=False)
         assert vs == approx(1.2)  # 2 * 50% chance of being greater
 
     def test_variability_score_pct(self, ghi):

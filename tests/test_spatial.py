@@ -1,4 +1,4 @@
-from pytest import approx, fixture
+from pytest import approx, fixture, raises
 
 import numpy as np
 import pandas as pd
@@ -81,7 +81,16 @@ def test__calc_zone():
 def test_latlon2utm_sitecompare(olat, olon):
     # Value compared with MATLAB known good numbers
     (E, N, zone) = spatial.latlon2utm(olat, olon)
-    assert(E, N, zone) == approx((447464.9005, 5888516.6988, 32))
+    assert (E, N, zone) == approx((447464.9005, 5888516.6988, 32))
+
+
+def test_latlon2utm_failure(olat, olon):
+    latarray = np.array([olat, olat, olat])
+    lonarray = np.array([olon, olon, olon])
+    with raises(ValueError):
+        (E, N, zone) = spatial.latlon2utm(latarray, lonarray[0:2])
+    with raises(ValueError):
+        (E, N, zone) = spatial.latlon2utm(latarray[0:2], lonarray)
 
 
 def test_latlon2utm_arrayin(olat, olon):
@@ -171,6 +180,15 @@ def test_utm2latlon_sitecompare(olat, olon):
     # Value compared with MATLAB known good numbers
     (lat, lon) = spatial.utm2latlon(447464.9005, 5888516.6988, zone=32)
     assert (lat, lon) == approx((olat, olon))
+
+
+def test_utm2latlon_failure(olat, olon):
+    earray = np.array([447464.9005, 447464.9005, 447464.9005])
+    narray = np.array([5888516.6988, 5888516.6988, 5888516.6988])
+    with raises(ValueError):
+        spatial.utm2latlon(earray, narray[0:2], zone=32)
+    with raises(ValueError):
+        spatial.utm2latlon(earray[0:2], narray, zone=32)
 
 
 def test_utm2latlon_arrayin(olat, olon):

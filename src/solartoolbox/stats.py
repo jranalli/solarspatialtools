@@ -307,6 +307,8 @@ def variability_index(ghi, clearsky, moving_avg_tau=1, norm=False):
     in Proceedings of the World Renewable Energy Forum (Denver, CO, 2012)
     pp. 13–17. https://www.osti.gov/biblio/1078490
     """
+    if not isinstance(ghi, (pd.Series, pd.DataFrame)):
+        raise TypeError('series must be a pandas Series or DataFrame')
 
     if moving_avg_tau > 1:
         dti = (ghi.index[1] - ghi.index[0]).total_seconds()
@@ -365,6 +367,9 @@ def darr(series, tau=1, moving_avg=True, pct=False):
     Photovoltaics: Research and Applications 22, 548–559 (2014),
     https://www.researchgate.net/publication/261603714_Empirical_assessment_of_short-term_variability_from_utility-scale_solar_PV_plants
     """
+    if not isinstance(series, (pd.Series, pd.DataFrame)):
+        raise TypeError('series must be a pandas Series or DataFrame')
+
     if moving_avg and tau > 1:
         dt = (series.index[1] - series.index[0]).total_seconds()
         rs = series.resample(str(int(tau * dt)) + 's').mean()
