@@ -1,1 +1,1 @@
-from solartoolbox.solartoolbox import *
+from solartoolbox.irradiance import *
