@@ -117,7 +117,9 @@ def compute_predicted_position(dfs, pos_utm, ref, cld_vecs=None, mode='preavg',
         distances_new = [distances[0][strongest.index],
                          distances[1][strongest.index]]
         pos_utm_new = pos_utm.loc[strongest.index]
-        com, pos = compute_intersection(pos_utm_new, cld_vecs, distances_new)
+        com, pos = compute_intersection(cld_vecs, distances_new)
+        com = com + np.nanmean(np.where(np.bitwise_not(np.isnan(pos)), pos_utm_new.values, np.nan), axis=0)
+        pos = pos + pos_utm_new.values
         fulldata = [fulldata[0].loc[strongest.index],
                     fulldata[1].loc[strongest.index]]
     elif mode == 'distance':
@@ -130,7 +132,9 @@ def compute_predicted_position(dfs, pos_utm, ref, cld_vecs=None, mode='preavg',
         distances_new = [distances[0][closest.index],
                          distances[1][closest.index]]
         pos_utm_new = pos_utm.loc[closest.index]
-        com, pos = compute_intersection(pos_utm_new, cld_vecs, distances_new)
+        com, pos = compute_intersection(cld_vecs, distances_new)
+        com = com + np.nanmean(np.where(np.bitwise_not(np.isnan(pos)), pos_utm_new.values, np.nan), axis=0)
+        pos = pos + pos_utm_new.values
         fulldata = [fulldata[0].loc[closest.index],
                     fulldata[1].loc[closest.index]]
     elif mode == 'preavg':
@@ -155,13 +159,20 @@ def compute_predicted_position(dfs, pos_utm, ref, cld_vecs=None, mode='preavg',
                     fulldata[0].loc[strongest1.index]['dist'])
         y = np.mean(distances[1][strongest2.index] -
                     fulldata[1].loc[strongest2.index]['dist'])
-        com, pos = compute_intersection(p, cld_vecs,
+        com, pos = compute_intersection(cld_vecs,
                                         [np.array([x]), np.array([y])])
         fulldata = [fulldata[0].loc[strongest1.index],
                     fulldata[1].loc[strongest2.index]]
+        com = pos_utm.loc[ref].values + com
+        pos = pos_utm.loc[ref] + pos.flatten()
     else:
         # Just compute using all points
-        com, pos = compute_intersection(pos_utm, cld_vecs, distances)
+        com, pos = compute_intersection(cld_vecs, distances)
+        com = com + np.nanmean(np.where(np.bitwise_not(np.isnan(pos)), pos_utm.values, np.nan), axis=0)
+        pos = pos + pos_utm.values
+    # Algorithm above assumes the origin is 0, 0. So offset with the actual
+    # origin of each source position
+
     return com, pos, fulldata
 
 
@@ -229,7 +240,7 @@ def compute_cloud_dist(df, ref, cld_vec, navgs=5,
     return cloud_dist, delay, coh
 
 
-def compute_intersection(pos_src, axes, distances):
+def compute_intersection(axes, distances):
     """
     Computes intersections of lines perpendicular to two vectors.
 
@@ -248,9 +259,6 @@ def compute_intersection(pos_src, axes, distances):
 
     Parameters
     ----------
-    pos_src : pd.DataFrame
-        List of source positions. Must be in Cartesian-like (i.e. x,y)
-        coordinates.
     axes : list[list] or np.array
         a 2x2 array of the vectors defining the two axes. Outer index is the
          axis, inner index is the coordinate x,y.
@@ -264,7 +272,7 @@ def compute_intersection(pos_src, axes, distances):
     -------
     com : np.array
         The computed mean position across all source positions
-    pos : pd.DataFrame
+    pos : pd.DataFrame or np.array
         The computed position for each individual source position
     """
 
@@ -294,13 +302,12 @@ def compute_intersection(pos_src, axes, distances):
     x = (Bmag2 * Ay - By * Amag2) / (Bx*Ay-Ax*By)
     y = (Amag2 * Bx - Ax * Bmag2) / (Bx*Ay-Ax*By)
 
-    # Algorithm above assumes the origin is 0, 0. So offset with the actual
-    # origin of each source position
-    pos = np.array([x, y]).T
-    pos = pos_src.values + pos
-
-    # Build back to dataframe
-    pos = pd.DataFrame(pos, columns=['E', 'N'], index=pos_src.index)
-    com = np.nanmean(pos.values, axis=0)
+    if isinstance(distances[0], (pd.Series, pd.DataFrame)):
+        # Build back to dataframe
+        pos = pd.DataFrame(np.array([x, y]).T, columns=['E', 'N'], index=distances[0].index)
+        com = np.nanmean(pos.values, axis=0)
+    else:
+        pos = np.array([x,y]).T
+        com = np.nanmean(pos, axis=0)
 
     return com, pos
