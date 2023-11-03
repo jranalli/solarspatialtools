@@ -108,7 +108,7 @@ def _get_pairs(all_points, must_contain=None, replacement=True):
 
 
 def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
-                corr_scaling='coeff', options={}):
+                corr_scaling='coeff', options=None):
     """
     Find Cloud Motion Vector based on clear sky index timeseries from a cluster
     of sensors using the method by Jamaly and Kleissl [1]. An alternate method
