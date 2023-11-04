@@ -117,7 +117,7 @@ def compute_predicted_position(dfs, pos_utm, ref, cld_vecs=None, mode='preavg',
         distances_new = [distances[0][strongest.index],
                          distances[1][strongest.index]]
         pos_utm_new = pos_utm.loc[strongest.index]
-        pos = compute_intersection(cld_vecs, distances_new)
+        pos = spatial.compute_intersection(cld_vecs, distances_new)
         pos = pos + pos_utm_new.values
         fulldata = [fulldata[0].loc[strongest.index],
                     fulldata[1].loc[strongest.index]]
@@ -131,7 +131,7 @@ def compute_predicted_position(dfs, pos_utm, ref, cld_vecs=None, mode='preavg',
         distances_new = [distances[0][closest.index],
                          distances[1][closest.index]]
         pos_utm_new = pos_utm.loc[closest.index]
-        pos = compute_intersection(cld_vecs, distances_new)
+        pos = spatial.compute_intersection(*axes2vecs(cld_vecs, distances_new))
         pos = pos + pos_utm_new.values
         fulldata = [fulldata[0].loc[closest.index],
                     fulldata[1].loc[closest.index]]
@@ -149,14 +149,15 @@ def compute_predicted_position(dfs, pos_utm, ref, cld_vecs=None, mode='preavg',
                     fulldata[0].loc[strongest1.index]['dist'])
         y = np.mean(distances[1][strongest2.index] -
                     fulldata[1].loc[strongest2.index]['dist'])
-        pos = compute_intersection(cld_vecs,
-                                        [np.array([x]), np.array([y])])
+
+        pos = spatial.compute_intersection(*axes2vecs(cld_vecs,
+                                        [np.array([x]), np.array([y])]))
         fulldata = [fulldata[0].loc[strongest1.index],
                     fulldata[1].loc[strongest2.index]]
         pos = pos_utm.loc[[ref]] + pos.flatten()
     else:
         # Just compute using all points
-        pos = compute_intersection(cld_vecs, distances)
+        pos = spatial.compute_intersection(*axes2vecs(cld_vecs, distances))
         pos = pos + pos_utm.values
 
     # Algorithm above assumes the origin is 0, 0. So offset with the actual
@@ -228,59 +229,21 @@ def compute_cloud_dist(df, ref, cld_vec, navgs=5,
 
     return cloud_dist, delay, coh
 
-
-def compute_intersection(axes, magnitudes):
-    """
-    Computes intersection of the lines perpendicular to two vectors.
-
-    Parameters
-    ----------
-    axes : list[list] or np.array
-        a 2x2 array of the vectors defining the two axes. Outer index is the
-         axis, inner index is the coordinate x,y.
-        in the form [[x1,y1], [x2,y2]]
-    magnitudes : list[pd.Series] or np.array
-        Magnitude of vector along each axis. Outer index is the
-        axis, inner index is the individual magnitude, e.g.
-        [[d1_1,d1_2,d1_3, ...], [d2_1,d2_2,d2_3, ...]]
-
-    Returns
-    -------
-    pos : pd.DataFrame or np.array
-        The computed position for each individual source position
-    """
-
-    # Alternate method available via line intersections at:
-    # https://stackoverflow.com/questions/3252194/numpy-and-line-intersections
-
-    # Derive by computing unit vectors a & b in dir of A&B
-    # Then compute a dot C and b dot C. These should be equal to the
-    # magnitudes of A and B. You now have an equation for x, y in terms
-    # of the known a, b, A, B. Thanks @ Nate Williams and David Starling.
-    cld_unit_A = spatial.unit(axes[0])
-    cld_unit_B = spatial.unit(axes[1])
-
+def axes2vecs(axes, magnitudes):
     if isinstance(magnitudes[0], pd.Series):
-        A = magnitudes[0].values[:, np.newaxis] * cld_unit_A
-        B = magnitudes[1].values[:, np.newaxis] * cld_unit_B
+        A = np.array(spatial.pol2rect(magnitudes[0].values, spatial.rect2pol(*axes[0])[1])).T
+        B = np.array(spatial.pol2rect(magnitudes[1].values, spatial.rect2pol(*axes[1])[1])).T
     else:
-        A = magnitudes[0][:, np.newaxis] * cld_unit_A
-        B = magnitudes[1][:, np.newaxis] * cld_unit_B
+        A = np.array(spatial.pol2rect(magnitudes[0], spatial.rect2pol(*axes[0])[1])).T
+        B = np.array(spatial.pol2rect(magnitudes[1], spatial.rect2pol(*axes[1])[1])).T
 
-    Ax = A[:, 0]
-    Ay = A[:, 1]
-    Bx = B[:, 0]
-    By = B[:, 1]
-    Amag2 = Ax**2 + Ay**2  # magnitude squared
-    Bmag2 = Bx**2 + By**2
-    x = (Bmag2 * Ay - By * Amag2) / (Bx*Ay-Ax*By)
-    y = (Amag2 * Bx - Ax * Bmag2) / (Bx*Ay-Ax*By)
+    # if isinstance(magnitudes[0], (pd.Series, pd.DataFrame)):
+    #     # Build back to dataframe
+    #     pos = pd.DataFrame(np.array([x, y]).T, columns=['E', 'N'],
+    #                        index=magnitudes[0].index)
+    # else:
+    #     pos = np.array([x, y]).T
 
-    if isinstance(magnitudes[0], (pd.Series, pd.DataFrame)):
-        # Build back to dataframe
-        pos = pd.DataFrame(np.array([x, y]).T, columns=['E', 'N'],
-                           index=magnitudes[0].index)
-    else:
-        pos = np.array([x, y]).T
+    return A, B
 
-    return pos
+
