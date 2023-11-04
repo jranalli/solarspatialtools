@@ -77,3 +77,41 @@ def test_compute_predicted_position_static_none(refdat_None):
         ndownsel=8)
 
     assert com == approx(expect, abs=1e-2)
+
+
+
+@pytest.fixture(params=range(9))
+def data(request):
+    #  [(Axis1 , Axis2),      (Dist),   (Point)]
+    # [((Ax, Ay), (Bx, By)), (Dx, Dy), (Px, Py)]
+    srcdata = [
+        [((1, 0), (0, 1)), (1, 1), (1, 1)],
+        [((1, 1), (1, -1)), (1, 1), (np.sqrt(2), 0)],  # rotated -45 degrees
+        [((-1, -1), (-1, 1)), (1, 1), (-np.sqrt(2), 0)],  # rotated +135 degrees
+        [((np.sqrt(3), 1), (1, -np.sqrt(3))), (1, 1), (np.sqrt(2)*np.cos(15*np.pi/180), -np.sqrt(2)*np.sin(15*np.pi/180))],  # initial case rotated -60 degrees
+        [((1, 0), (0, 1)), (4, 1), (4, 1)],  # Different lengths
+        [((1, 0), (0, 1)), (1, 4), (1, 4)],
+        [((1, 0), (0, 1)), (3, 4), (3, 4)],
+        [((1, 1), (1, 0)), (1, np.sqrt(2)), (np.sqrt(2), 0)],  # 45 degree separation
+        [((np.sqrt(3), 1), (np.sqrt(3), -1)), (2, 2), (4/np.sqrt(3), 0)],  # 60 degree separation evenly about x axis
+    ]
+    return srcdata[request.param]
+
+
+@pytest.fixture(params=[1, 10])
+def n(request):
+    return request.param
+
+
+def test_compute_intersection(data, n):
+
+    axes = data[0]
+
+    distances = (np.repeat(np.array([data[1][0]]), n),
+                 np.repeat(np.array([data[1][1]]), n))
+
+    expected_output = np.repeat(np.array([data[2]]), n, axis=0)
+
+    pos = field.compute_intersection(axes, distances)
+
+    assert pos == approx(expected_output)

@@ -117,8 +117,7 @@ def compute_predicted_position(dfs, pos_utm, ref, cld_vecs=None, mode='preavg',
         distances_new = [distances[0][strongest.index],
                          distances[1][strongest.index]]
         pos_utm_new = pos_utm.loc[strongest.index]
-        com, pos = compute_intersection(cld_vecs, distances_new)
-        com = com + np.nanmean(np.where(np.bitwise_not(np.isnan(pos)), pos_utm_new.values, np.nan), axis=0)
+        pos = compute_intersection(cld_vecs, distances_new)
         pos = pos + pos_utm_new.values
         fulldata = [fulldata[0].loc[strongest.index],
                     fulldata[1].loc[strongest.index]]
@@ -132,22 +131,13 @@ def compute_predicted_position(dfs, pos_utm, ref, cld_vecs=None, mode='preavg',
         distances_new = [distances[0][closest.index],
                          distances[1][closest.index]]
         pos_utm_new = pos_utm.loc[closest.index]
-        com, pos = compute_intersection(cld_vecs, distances_new)
-        com = com + np.nanmean(np.where(np.bitwise_not(np.isnan(pos)), pos_utm_new.values, np.nan), axis=0)
+        pos = compute_intersection(cld_vecs, distances_new)
         pos = pos + pos_utm_new.values
         fulldata = [fulldata[0].loc[closest.index],
                     fulldata[1].loc[closest.index]]
     elif mode == 'preavg':
         # Compute the average position on the two axes first, prior to
         # computing the implied position
-
-        p = pos_utm.loc[[ref]]
-
-        # # An option to downselect by distance
-        # separations = pd.DataFrame({'sep': [
-        #     spatial.magnitude(row[1] - pos_utm.loc[ref]) for row in
-        #     pos_utm.iterrows()]}, index=pos_utm.index)
-        # closest = separations.sort_values('sep').iloc[:ndownsel,:]
 
         # Downselect by best coherence in each axis
         coh1 = fulldata[0]['coh']
@@ -159,20 +149,19 @@ def compute_predicted_position(dfs, pos_utm, ref, cld_vecs=None, mode='preavg',
                     fulldata[0].loc[strongest1.index]['dist'])
         y = np.mean(distances[1][strongest2.index] -
                     fulldata[1].loc[strongest2.index]['dist'])
-        com, pos = compute_intersection(cld_vecs,
+        pos = compute_intersection(cld_vecs,
                                         [np.array([x]), np.array([y])])
         fulldata = [fulldata[0].loc[strongest1.index],
                     fulldata[1].loc[strongest2.index]]
-        com = pos_utm.loc[ref].values + com
-        pos = pos_utm.loc[ref] + pos.flatten()
+        pos = pos_utm.loc[[ref]] + pos.flatten()
     else:
         # Just compute using all points
-        com, pos = compute_intersection(cld_vecs, distances)
-        com = com + np.nanmean(np.where(np.bitwise_not(np.isnan(pos)), pos_utm.values, np.nan), axis=0)
+        pos = compute_intersection(cld_vecs, distances)
         pos = pos + pos_utm.values
+
     # Algorithm above assumes the origin is 0, 0. So offset with the actual
     # origin of each source position
-
+    com = np.nanmean(pos, axis=0)
     return com, pos, fulldata
 
 
@@ -240,22 +229,9 @@ def compute_cloud_dist(df, ref, cld_vec, navgs=5,
     return cloud_dist, delay, coh
 
 
-def compute_intersection(axes, distances):
+def compute_intersection(axes, magnitudes):
     """
-    Computes intersections of lines perpendicular to two vectors.
-
-    The use case is to compute the implied position of a sensor based upon
-    distances along two cloud motion axes. Uses known positions of original
-    sensors and distances along the cloud axes to define initial vectors. Then
-    computes the intersection of the perpendicular lines to each of those
-    vectors representing the implied position of the sensor.
-    a group of sensors, along with a set of distances along two different axes.
-
-    The distances represent the separation of the target sensor from each of
-    the known_positions sensors along the defined axes.
-
-    Algorithm works by finding the intersection of the perpendicular lines to
-    each axis.
+    Computes intersection of the lines perpendicular to two vectors.
 
     Parameters
     ----------
@@ -263,15 +239,13 @@ def compute_intersection(axes, distances):
         a 2x2 array of the vectors defining the two axes. Outer index is the
          axis, inner index is the coordinate x,y.
         in the form [[x1,y1], [x2,y2]]
-    distances : list[pd.Series] or np.array
-        Projected distance of each sensor along each axis. Outer index is the
-        axis, inner index is the individual position sensor, e.g.
+    magnitudes : list[pd.Series] or np.array
+        Magnitude of vector along each axis. Outer index is the
+        axis, inner index is the individual magnitude, e.g.
         [[d1_1,d1_2,d1_3, ...], [d2_1,d2_2,d2_3, ...]]
 
     Returns
     -------
-    com : np.array
-        The computed mean position across all source positions
     pos : pd.DataFrame or np.array
         The computed position for each individual source position
     """
@@ -286,12 +260,12 @@ def compute_intersection(axes, distances):
     cld_unit_A = spatial.unit(axes[0])
     cld_unit_B = spatial.unit(axes[1])
 
-    if isinstance(distances[0], pd.Series):
-        A = distances[0].values[:, np.newaxis] * cld_unit_A
-        B = distances[1].values[:, np.newaxis] * cld_unit_B
+    if isinstance(magnitudes[0], pd.Series):
+        A = magnitudes[0].values[:, np.newaxis] * cld_unit_A
+        B = magnitudes[1].values[:, np.newaxis] * cld_unit_B
     else:
-        A = distances[0][:, np.newaxis] * cld_unit_A
-        B = distances[1][:, np.newaxis] * cld_unit_B
+        A = magnitudes[0][:, np.newaxis] * cld_unit_A
+        B = magnitudes[1][:, np.newaxis] * cld_unit_B
 
     Ax = A[:, 0]
     Ay = A[:, 1]
@@ -302,12 +276,11 @@ def compute_intersection(axes, distances):
     x = (Bmag2 * Ay - By * Amag2) / (Bx*Ay-Ax*By)
     y = (Amag2 * Bx - Ax * Bmag2) / (Bx*Ay-Ax*By)
 
-    if isinstance(distances[0], (pd.Series, pd.DataFrame)):
+    if isinstance(magnitudes[0], (pd.Series, pd.DataFrame)):
         # Build back to dataframe
-        pos = pd.DataFrame(np.array([x, y]).T, columns=['E', 'N'], index=distances[0].index)
-        com = np.nanmean(pos.values, axis=0)
+        pos = pd.DataFrame(np.array([x, y]).T, columns=['E', 'N'],
+                           index=magnitudes[0].index)
     else:
-        pos = np.array([x,y]).T
-        com = np.nanmean(pos, axis=0)
+        pos = np.array([x, y]).T
 
-    return com, pos
+    return pos
