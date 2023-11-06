@@ -9,9 +9,9 @@ warnings.filterwarnings("ignore",
                         message=".*Covariance of the parameters.*")
 
 
-def compute_predicted_position(dfs, pos_utm, ref, cld_vecs=None, mode='preavg',
-                               ndownsel=8, navgs=5,
-                               coh_limit=0.6, freq_limit=0.02):
+def compute_predicted_position(dfs, pos_utm, ref, cld_vecs=None,
+                               mode='coherence', ndownsel=8,
+                               navgs=5, coh_limit=0.6, freq_limit=0.02):
     """
     Compute the predicted position of a combiner based upon the cloud movement.
     Requires two separate inputs with different CMV directions. Inputs are
@@ -31,8 +31,11 @@ def compute_predicted_position(dfs, pos_utm, ref, cld_vecs=None, mode='preavg',
         The cloud motion vectors, [[Vx1, Vy1], [Vx2, Vy2]]
     mode : str
         The method for downselecting the points to use for computing the
-        position. Options are 'coherence', 'distance', and 'preavg'. Default is
-        'preavg'. Any other option will use all points.
+        position. Options are 'coherence', 'global_coherence', 'distance', and
+        'all'. 'coherence' will choose the n best points for each CMV that
+        experience the best coherence. 'global_coherence' computes an
+        orthogonal sum of coherence for both CMV's and chooses the same best n
+        points across both. Default is 'coherence'.
     ndownsel : int
         The number of points to downselect to. Default is 8.
     navgs : int
@@ -70,7 +73,7 @@ def compute_predicted_position(dfs, pos_utm, ref, cld_vecs=None, mode='preavg',
     # could be improved on plant-level calculations by pre-computing all delays
     # for every point pair.
 
-    fulldata = []
+    combined_data = []
 
     if cld_vecs is None:
         cld_vecs = []
@@ -79,91 +82,133 @@ def compute_predicted_position(dfs, pos_utm, ref, cld_vecs=None, mode='preavg',
                                                     method='jamaly')
             cld_vecs.append(spatial.pol2rect(cld_spd, cld_dir))
 
-    distances = []
     for df, cld_vec in zip(dfs, cld_vecs):
 
-        # Compute the distance along the CMV implied by the delay
-        cloud_dist, delay, coh = compute_cloud_dist(df, ref, cld_vec,
-                                                    navgs=navgs,
-                                                    coh_limit=coh_limit,
-                                                    freq_limit=freq_limit)
+        # Get the pairwise delays
+        delay, coh = compute_delays(df, ref, navgs=navgs,
+                                    coh_limit=coh_limit,
+                                    freq_limit=freq_limit)
+
+        # Convert them to distances along the cloud motion vector
+        delay_dist = -delay * spatial.magnitude(cld_vec)
 
         # Compute the actual separation distance for comparison
         # Negative gives dist from all points to ref, rather than vice versa
         pos_vecs = -spatial.compute_vectors(pos_utm['E'], pos_utm['N'],
                                             pos_utm.loc[ref][['E', 'N']])
         # Project the vec from point to ref into the cloud vector dir
-        true_dist = spatial.project_vectors(pos_vecs, cld_vec)
+        plan_dist = spatial.project_vectors(pos_vecs, cld_vec)
+
+        error_dist = delay_dist - plan_dist['dist']
 
         # Aggregate
-        pos_dist = pd.DataFrame({'dist': true_dist['dist'],
-                                 'cloud_dist': cloud_dist,
+        pos_data = pd.DataFrame({'plan_dist': plan_dist['dist'],
+                                 'delay_dist': delay_dist,
+                                 'error_dist': error_dist,
                                  'delay': delay,
                                  'coh': coh},
                                 index=pos_utm.index)
 
-        # Store them for both different wind directions
-        distances.append(pos_dist['cloud_dist'])
+        combined_data.append(pos_data)
 
-        fulldata.append(pos_dist)
-
-    if mode == 'coherence':
+    if mode == 'coherence' or mode == 'preavg':  # preavg is for back compat.
+        # Downselect by best coherence in each axis
+        coh1 = combined_data[0]['coh']
+        ix1 = coh1.sort_values().iloc[-ndownsel:-1].index
+        coh2 = combined_data[1]['coh']
+        ix2 = coh2.sort_values().iloc[-ndownsel:-1].index
+    elif mode == 'global_coherence':
         # Downselect to the points with the strongest overall coherence
         # An orthogonal sum of coherence for the two axes
-        truecoh = fulldata[0]['coh'] ** 2 + fulldata[1]['coh'] ** 2
+        truecoh = combined_data[0]['coh'] ** 2 + combined_data[1]['coh'] ** 2
         truecoh = pd.DataFrame(truecoh, columns=['coh'],
-                               index=fulldata[0]['coh'].index)
-        strongest = truecoh.sort_values('coh').iloc[-ndownsel:-1, :]
-        distances_new = [distances[0][strongest.index],
-                         distances[1][strongest.index]]
-        pos_utm_new = pos_utm.loc[strongest.index]
-        pos = spatial.compute_intersection(cld_vecs, distances_new)
-        pos = pos + pos_utm_new.values
-        fulldata = [fulldata[0].loc[strongest.index],
-                    fulldata[1].loc[strongest.index]]
+                               index=combined_data[0]['coh'].index)
+        ix = truecoh.sort_values('coh').iloc[-ndownsel:-1, :].index
+        ix1 = ix2 = ix
     elif mode == 'distance':
         # Downselect to the closest Points
         separations = pd.DataFrame({'sep': [
             spatial.magnitude(row[1] - pos_utm.loc[ref]) for row in
             pos_utm.iterrows()]}, index=pos_utm.index)
         # Zeroth index is always "self", but needs to be included
-        closest = separations.sort_values('sep').iloc[:ndownsel, :]
-        distances_new = [distances[0][closest.index],
-                         distances[1][closest.index]]
-        pos_utm_new = pos_utm.loc[closest.index]
-        pos = spatial.compute_intersection(*axes2vecs(cld_vecs, distances_new))
-        pos = pos + pos_utm_new.values
-        fulldata = [fulldata[0].loc[closest.index],
-                    fulldata[1].loc[closest.index]]
-    elif mode == 'preavg':
-        # Compute the average position on the two axes first, prior to
-        # computing the implied position
-
-        # Downselect by best coherence in each axis
-        coh1 = fulldata[0]['coh']
-        strongest1 = coh1.sort_values().iloc[-ndownsel:-1]
-        coh2 = fulldata[1]['coh']
-        strongest2 = coh2.sort_values().iloc[-ndownsel:-1]
-
-        x = np.mean(distances[0][strongest1.index] -
-                    fulldata[0].loc[strongest1.index]['dist'])
-        y = np.mean(distances[1][strongest2.index] -
-                    fulldata[1].loc[strongest2.index]['dist'])
-
-        pos = spatial.compute_intersection(*axes2vecs(cld_vecs,
-                                        [np.array([x]), np.array([y])]))
-        fulldata = [fulldata[0].loc[strongest1.index],
-                    fulldata[1].loc[strongest2.index]]
-        pos = pos_utm.loc[[ref]] + pos.flatten()
-    else:
+        ix = separations.sort_values('sep').iloc[:ndownsel, :].index
+        ix1 = ix2 = ix
+    elif mode == 'all':
         # Just compute using all points
-        pos = spatial.compute_intersection(*axes2vecs(cld_vecs, distances))
-        pos = pos + pos_utm.values
+        ix1 = ix2 = pos_utm.index
+    else:
+        raise ValueError(f"Invalid mode: {mode}")
 
-    # Algorithm above assumes the origin is 0, 0. So offset with the actual
-    # origin of each source position
-    com = np.nanmean(pos, axis=0)
-    return com, pos, fulldata
+    # Average the positions in the A and B directions
+    combined_data = [combined_data[0].loc[ix1], combined_data[1].loc[ix2]]
+    e_a = np.mean(combined_data[0]['error_dist'])
+    e_b = np.mean(combined_data[1]['error_dist'])
+
+    # The vectors to intersect are parallel to the CMVs and have magntiude
+    # equal to e_a and e_b.
+    pos = spatial.compute_intersection(
+        np.array([spatial.pol2rect(e_a, spatial.rect2pol(*cld_vecs[0])[1])]),
+        np.array([spatial.pol2rect(e_b, spatial.rect2pol(*cld_vecs[1])[1])])
+    )
+
+    # Algorithm above assumes the origin is (0, 0). Shift by the ref pt
+    pos = (pos + pos_utm.loc[ref].values).flatten()
+
+    return pos, combined_data
+
+
+def compute_delays(df, ref, navgs=5, coh_limit=0.6, freq_limit=0.02):
+    """
+    Computes delay between groups of signals. Will find the delay between the
+    reference and every using a transfer function between the reference and
+    those possible points.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Time series of the data. Columns are the points, rows are the time.
+    ref : str
+        The name of the reference point. Must be a column in df.
+    navgs : int
+        The number of averages to use when computing the transfer function.
+        Affects both the coherence and the frequency resolution. Default is 5.
+        see solartoolbox.signalproc.averaged_tf for more information.
+    coh_limit : float
+        The minimum coherence required for computing the delay. Default is 0.6.
+        See solartoolbox.signalproc.tf_delay for more information.
+    freq_limit : float
+        The maximum frequency that will be used when computing the delay.
+        Default is 0.02. See solartoolbox.signalproc.tf_delay for more info.
+
+    Returns
+    -------
+    delay : np.ndarray
+        The raw delay for the point pair computed from the TF phase
+    coh : np.ndarray
+        The average coherence for each transfer function within the window.
+    """
+
+    # Compute delay for every point pair for this reference
+    delay = np.zeros_like(df.columns, dtype=float)
+    coh = np.zeros_like(df.columns, dtype=float)
+    ts_in = df[ref]
+    for i, point in enumerate(df.columns):
+        ts_out = df[point]
+
+        # Compute TF
+        tf = signalproc.averaged_tf(ts_in, ts_out, navgs=navgs, overlap=0.5,
+                                    window='hamming', detrend=None)
+        # Find the time delay from the TF phase
+        delay[i], ix = signalproc.tf_delay(tf,
+                                           coh_limit=coh_limit,
+                                           freq_limit=freq_limit)
+
+        # How good was the coherence? Average across TF
+        tfsub = tf['coh'][tf.index < freq_limit]
+        coh[i] = np.sum(tfsub) / len(tfsub)
+        # coh[i] = np.sum(tf['coh']) / len(tf['coh'])  # Alt average of all TF
+
+    return delay, coh
 
 
 def compute_cloud_dist(df, ref, cld_vec, navgs=5,
@@ -228,22 +273,3 @@ def compute_cloud_dist(df, ref, cld_vec, navgs=5,
         # coh[i] = np.sum(tf['coh']) / len(tf['coh'])  # Alt average of all TF
 
     return cloud_dist, delay, coh
-
-def axes2vecs(axes, magnitudes):
-    if isinstance(magnitudes[0], pd.Series):
-        A = np.array(spatial.pol2rect(magnitudes[0].values, spatial.rect2pol(*axes[0])[1])).T
-        B = np.array(spatial.pol2rect(magnitudes[1].values, spatial.rect2pol(*axes[1])[1])).T
-    else:
-        A = np.array(spatial.pol2rect(magnitudes[0], spatial.rect2pol(*axes[0])[1])).T
-        B = np.array(spatial.pol2rect(magnitudes[1], spatial.rect2pol(*axes[1])[1])).T
-
-    # if isinstance(magnitudes[0], (pd.Series, pd.DataFrame)):
-    #     # Build back to dataframe
-    #     pos = pd.DataFrame(np.array([x, y]).T, columns=['E', 'N'],
-    #                        index=magnitudes[0].index)
-    # else:
-    #     pos = np.array([x, y]).T
-
-    return A, B
-
-
