@@ -195,3 +195,113 @@ def test_apply_delay(delay):
 
     # Check that the delayed transfer function matches the expected one
     assert np.allclose(tf_delayed['tf'], tf_expected['tf'], atol=1e-5)
+
+
+
+
+def test_averaged_psd_multi():
+    np.random.seed(2023)
+    # Create a simple sinusoidal signal
+    fs = 10  # sample rate
+    T = 5.0    # seconds
+    t = np.linspace(0, T, int(T*fs), endpoint=False)  # time variable
+
+    x1 = 0.5 * np.sin(2 * np.pi * 2 * t) + np.random.random(len(t))
+    x2 = 0.5 * np.sin(2 * np.pi * 2 * t) + np.random.random(len(t))
+    x3 = 0.5 * np.sin(2 * np.pi * 2 * t) + np.random.random(len(t))
+    x4 = 0.5 * np.sin(2 * np.pi * 2 * t) + np.random.random(len(t))
+
+    xs = [x1, x2, x3, x4]
+    tsigs = [pd.Series(x, index=pd.TimedeltaIndex(t, 's')) for x in xs]
+    navgs = 5
+    overlap = 0.5
+    window = 'hamming'
+    detrend = 'linear'
+    scaling = 'density'
+    psds = [averaged_psd(tsig, navgs, overlap, window, detrend, scaling) for tsig in tsigs]
+
+
+
+    # Calculate the PSD directly using scipy.signal.welch
+    freqs, psd_direct = signal.welch(xs, fs, window, nperseg=len(x1)//navgs,
+                                     noverlap=int(overlap*len(x1)//navgs),
+                                     detrend=detrend, scaling=scaling)
+
+    # Check that the PSDs match
+    assert np.allclose(psds, psd_direct, atol=1e-5)
+
+
+def test_averaged_tf_multi():
+    np.random.seed(2023)
+    # Create a simple sinusoidal signal
+    fs = 10  # sample rate
+    T = 5.0    # seconds
+    t = np.linspace(0, T, int(T*fs), endpoint=False)  # time variable
+    delay = 0.25
+
+
+    x = 0.5 * np.sin(2 * np.pi * 2 * t) + np.random.random(len(t))
+
+    y1 = np.roll(x, int(delay*fs))
+    y2 = np.roll(x, int(2*delay * fs))
+    y3 = np.roll(x, int(3*delay * fs))
+    y4 = np.roll(x, int(4*delay * fs))
+
+    ys = [y1, y2, y3, y4]
+
+    x_tsig = pd.Series(x, index=pd.TimedeltaIndex(t, 's'))
+    ysigs = [pd.Series(y, index=pd.TimedeltaIndex(t, 's')) for y in ys]
+    navgs = 5
+    overlap = 0.5
+    window = 'hamming'
+    detrend = 'linear'
+    tfs = [averaged_tf(x_tsig, ysig, navgs, overlap, window, detrend)['tf'] for ysig in ysigs]
+
+    ##########################
+    # Seems like this works as long as you do a list of signals for the y, rather than a dataframe of signals.
+    # If you have a dataframe of signals, you can convert by dff.values.T.tolist()
+    ##########################
+
+    # Calculate the PSD directly using scipy.signal.welch
+    # Calculate the transfer function directly using scipy csd and welch
+    freqs, Pxy = signal.csd(x_tsig, ysigs, fs, window, nperseg=len(x)//navgs,
+                            noverlap=int(overlap*len(x)//navgs),
+                            detrend=detrend)
+    freqs, Pxx = signal.welch(x_tsig, fs, window, nperseg=len(x)//navgs,
+                              noverlap=int(overlap*len(x)//navgs),
+                              detrend=detrend)
+    tf_direct = Pxy / Pxx
+
+    # Check that the PSDs match
+    assert np.allclose(tfs, tf_direct, atol=1e-5)
+
+def test_correlation_multi():
+    np.random.seed(2023)
+    # Create a simple sinusoidal signal
+    fs = 10  # sample rate
+    T = 5.0  # seconds
+    t = np.linspace(0, T, int(T * fs), endpoint=False)  # time variable
+    delay = 0.25
+
+    x = 0.5 * np.sin(2 * np.pi * 2 * t) + np.random.random(len(t))
+
+    y1 = np.roll(x, int(delay * fs))
+    y2 = np.roll(x, int(2 * delay * fs))
+    y3 = np.roll(x, int(3 * delay * fs))
+    y4 = np.roll(x, int(4 * delay * fs))
+
+    ys = [y1, y2, y3, y4]
+    x_tsig = pd.Series(x, index=pd.TimedeltaIndex(t, 's'))
+    ysigs = [pd.Series(y, index=pd.TimedeltaIndex(t, 's')) for y in ys]
+
+    corr = [correlation(x_tsig, y_tsig, scaling='none')[0] for y_tsig in ysigs]
+    corr = np.array(corr)
+
+    c = signal.correlate([x_tsig], ysigs)
+
+    assert np.allclose(corr, np.flip(c, axis=0))
+
+def test_correlation_illegal(corr_data):
+    d, t, x1, x2, dly = corr_data
+    with raises(ValueError):
+        c, lag = correlation(x1, x2, scaling="illegal")
