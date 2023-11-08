@@ -73,6 +73,8 @@ def correlation(baseline, estimation, scaling='coeff'):
         corr = num / den
         scale = (len(baseline) - np.abs(lags)) / len(baseline)
         corr /= scale
+    elif scaling.lower() == 'none':
+        corr = scipy.signal.correlate(baseline, estimation)
     else:
         raise ValueError("Illegal scaling specified.")
 
