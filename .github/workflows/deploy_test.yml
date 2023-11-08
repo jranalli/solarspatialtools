@@ -2,8 +2,8 @@ name: Publish distribution
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - *
 
 jobs:
   build:
