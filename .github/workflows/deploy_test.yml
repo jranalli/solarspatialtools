@@ -1,4 +1,4 @@
-name: Publish distribution to TestPyPI
+name: Publish distribution
 
 on:
   push:
