@@ -1,9 +1,9 @@
 import numpy as np
-from scipy import signal
 from scipy.optimize import minimize_scalar, leastsq
+
+from solartoolbox.signalproc import correlation
 from solartoolbox.spatial import project_vectors, compute_vectors
 from solartoolbox.spatial import pol2rect, magnitude
-from solartoolbox import stats
 
 from enum import Enum
 import itertools
@@ -108,7 +108,7 @@ def _get_pairs(all_points, must_contain=None, replacement=True):
 
 
 def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
-                corr_scaling='coeff', options={}):
+                corr_scaling='coeff', options=None):
     """
     Find Cloud Motion Vector based on clear sky index timeseries from a cluster
     of sensors using the method by Jamaly and Kleissl [1]. An alternate method
@@ -273,7 +273,7 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
         dist = magnitude(vec)
 
         # Compute the site-pair cross correlation.
-        xcorr_i, lags = stats.correlation(sig0, sig1, corr_scaling)
+        xcorr_i, lags = correlation(sig0, sig1, corr_scaling)
         lags = lags * dt
         peak_lag_index = xcorr_i.argmax()  # Index of peak correlation
 

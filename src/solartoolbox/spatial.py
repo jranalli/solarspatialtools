@@ -424,3 +424,51 @@ def compute_vectors(x, y, refpt):
                             index=x.index, columns=['dx', 'dy'])
     else:
         return np.array(vectors)
+
+
+def compute_intersection(A, B):
+    """
+    Computes intersection, C, of the lines perpendicular to the tips of two
+    vectors (A and B) who share a starting point at the origin.
+
+    Vectors are specified in nx2 arrays and computations of Ci are made for
+    each vector pair Ai, Bi.
+
+    Parameters
+    ----------
+    A : np.array
+        nx2 array of the vectors. Outer index is the vector instance, inner
+        index is the coordinate x,y:
+        [[ax1,ay1], [ax2,ay2], ..., [axn,ayn]]
+    B : np.array
+        nx2 array of the vectors. Outer index is the vector instance, inner
+        index is the coordinate x,y:
+        [[bx1,by1], [bx2,by2], ..., [bxn,byn]]
+
+    Returns
+    -------
+    C : np.array
+        nx2 array of computed positions of the intersection.
+        [[cx1,cy1], [cx2,cy2], ..., [cxn,cyn]]
+    """
+
+    # Alternate method available via line intersections at:
+    # https://stackoverflow.com/questions/3252194/numpy-and-line-intersections
+
+    # Derive by computing unit vectors a & b in dir of A&B
+    # Then compute a dot C and b dot C. These should be equal to the
+    # magnitudes of A and B. You now have an equation for cx, cy in terms
+    # of the known a, b, A, B. Thanks @ Nate Williams and David Starling.
+
+    Ax = A[:, 0]
+    Ay = A[:, 1]
+    Bx = B[:, 0]
+    By = B[:, 1]
+    Amag2 = Ax**2 + Ay**2  # magnitude squared
+    Bmag2 = Bx**2 + By**2
+    cx = (Bmag2 * Ay - By * Amag2) / (Bx*Ay-Ax*By)
+    cy = (Amag2 * Bx - Ax * Bmag2) / (Bx*Ay-Ax*By)
+
+    C = np.array([cx, cy]).T
+
+    return C

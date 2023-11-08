@@ -1,10 +1,11 @@
 import pytest
-from pytest import approx
+from pytest import approx, raises
 
 import numpy as np
 import numpy.testing as npt
 import pandas as pd
 
+import solartoolbox.signalproc
 from solartoolbox import stats
 
 
@@ -77,49 +78,6 @@ class TestErrorFunctions:
     def test_be_value(self, datax, datay):
         assert stats.bias_error(datax, datay).sum() == approx(20)
         assert stats.bias_error(datay, datax).sum() == approx(-20)
-
-
-class TestCorrelation:
-    """
-    Forms of the correlation function
-    """
-
-    @pytest.fixture(params=[0, 0.2, -0.2, 0.4, -0.4, 1, -1])
-    def corr_data(self, request):
-        dt = 0.01
-        dly = request.param  # variable delay
-        t = np.arange(0, 10, 0.01)
-        f = 1
-
-        # Single half-period pulse of sine wave
-        x1 = np.sin(2 * np.pi * f * t)
-        x1[t < 4*(1/f)] = 0
-        x1[t > 4.5*(1/f)] = 0
-
-        # Delayed version
-        x2 = np.sin(2 * np.pi * f * (t - dly))  # delay by 0.2 seconds
-        x2[t < 4*(1/f) + dly] = 0
-        x2[t > 4.5*(1/f) + dly] = 0
-        return dt, t, x1, x2, dly
-
-    @pytest.fixture(params=['energy', 'coeff',
-                            'unbiased_energy', 'unbiased_coeff'])
-    def scaling(self, request):
-        return request.param
-
-    def test_correlation_identity(self, corr_data, scaling):
-        dt, t, x1, x2, dly = corr_data
-        c, lag = stats.correlation(x1, x1, scaling=scaling)
-        imax = np.argmax(c)
-
-        assert c[imax] == approx(1)
-        assert -lag[imax]*(t[1]-t[0]) == approx(0)
-
-    def test_correlation_shift(self, corr_data, scaling):
-        d, t, x1, x2, dly = corr_data
-        c, lag = stats.correlation(x1, x2, scaling=scaling)
-        imax = np.argmax(c)
-        assert -lag[imax]*(t[1]-t[0]) == approx(dly)  # -lag * dt == t_shift
 
 
 class TestQuantile:
@@ -195,6 +153,11 @@ class TestVariabilityMetrics:
         assert stats.variability_index(data, cs, moving_avg_tau=1, norm=False)\
                == approx((5937 + 2 * np.sqrt(2)) / 5939)
 
+    def test_variability_index_illegal(self, variability_score_data):
+        data, cs = variability_score_data
+        with raises(TypeError):
+            stats.variability_index(data.values, cs)
+
     def test_variability_index_movingavg(self, variability_score_data):
         data, cs = variability_score_data
         assert stats.variability_index(data, cs, moving_avg_tau=2, norm=False)\
@@ -211,6 +174,12 @@ class TestVariabilityMetrics:
 
         assert stats.darr(data, moving_avg=False, pct=False) == approx(2)
         assert stats.darr(data, pct=False) == approx(2)
+
+    def test_darr_illegal(self, darr_data):
+        data = darr_data
+        data.iloc[2] = 6
+        with raises(TypeError):
+            stats.darr(data.values, moving_avg=False, pct=False)
 
     def test_darr_pct(self, darr_data):
         data = darr_data
@@ -230,6 +199,14 @@ class TestVariabilityMetrics:
 
     def test_variability_score_basic(self, ghi):
         vs = stats.variability_score(ghi, tau=1, moving_avg=False, pct=False)
+        assert vs == approx(1.2)  # 2 * 50% chance of being greater
+
+    def test_variability_score_pandas(self, ghi):
+        vs = stats.variability_score(pd.Series(ghi), tau=1,
+                                     moving_avg=False, pct=False)
+        assert vs == approx(1.2)  # 2 * 50% chance of being greater
+        vs = stats.variability_score(pd.DataFrame(ghi), tau=1,
+                                     moving_avg=False, pct=False)
         assert vs == approx(1.2)  # 2 * 50% chance of being greater
 
     def test_variability_score_pct(self, ghi):

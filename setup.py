@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
-ver = '0.2.4'
+ver = '0.3.0'
 
 
 setup(
@@ -28,5 +28,5 @@ setup(
         'scipy'
     ],
     license='BSD (3 Clause)',
-    extras_require=dict(tests=['pytest'], demos=['matplotlib']),
+    extras_require=dict(tests=['pytest'], demos=['matplotlib', 'jupyter']),
 )

@@ -1,16 +1,86 @@
 import numpy as np
 import pandas as pd
+import scipy.signal
 from scipy import signal
 from scipy.interpolate import interp1d
 from scipy.optimize import curve_fit
-import pvlib
 
-from solartoolbox import spatial, stats
+from solartoolbox import spatial
 
 
-# Library for Analyzing Time Series Transfer Functions
+def correlation(baseline, estimation, scaling='coeff'):
+    """
+    Compute the cross correlation between two signals, including the full range
+    of possible time lags.
+
+    The value of correlation at lags==0 is the traditional cross-correlation
+    without allowing for time shifting.
+
+    This function is essentially a wrapper for scipy.stats.correlate, providing
+    pre-baked scaling options, and always returning the lags.
+
+    Parameters
+    ----------
+    baseline : numeric or pandas.Series
+        The baseline signal
+
+    estimation : numeric or pandas.Series
+        The predicted signal
+
+    scaling : a string for the type scaling to use
+        Either 'energy', 'coeff', 'unbiased_energy', 'unbiased_coeff'
+        'energy' - scales by the energy of the autocorrelation of the input
+        'coeff' - scales the output to the correlation coefficient (always
+                  removes the mean from both signals)
+        'unbiased_energy' - similar to energy, but normalizes based on lag to
+                            account for the fewer points used in the
+                            convolution. Removes bias towards small lags.
+        'unbiased_coeff' - similar to coeff, but normalizes based on lag to
+                            account for the fewer points used in the
+                            convolution. Removes bias towards small lags.
+
+    Returns
+    -------
+    corr : numeric
+        A vector of the cross correlations
+
+    lag : numeric
+        A vector of the lag for each cross correlation
+    """
+
+    # The time lags
+    lags = scipy.signal.correlation_lags(len(baseline), len(estimation))
+
+    if scaling.lower() == 'energy':
+        autocorr = scipy.signal.correlate(baseline, baseline)
+        energy = np.max(autocorr)
+        corr = scipy.signal.correlate(baseline, estimation) / energy
+    elif scaling.lower() == 'coeff':
+        num = scipy.signal.correlate(baseline - np.mean(baseline),
+                                     estimation - np.mean(estimation))
+        den = len(baseline) * (np.std(baseline) * np.std(estimation))
+        corr = num / den
+    elif scaling.lower() == 'unbiased_energy':
+        autocorr = scipy.signal.correlate(baseline, baseline)
+        energy = np.max(autocorr)
+        corr = scipy.signal.correlate(baseline, estimation) / energy
+        scale = (len(baseline) - np.abs(lags)) / len(baseline)
+        corr /= scale
+    elif scaling.lower() == 'unbiased_coeff':
+        num = scipy.signal.correlate(baseline - np.mean(baseline),
+                                     estimation - np.mean(estimation))
+        den = len(baseline) * (np.std(baseline) * np.std(estimation))
+        corr = num / den
+        scale = (len(baseline) - np.abs(lags)) / len(baseline)
+        corr /= scale
+    else:
+        raise ValueError("Illegal scaling specified.")
+
+    return corr, lags
+
+
 def averaged_psd(input_tsig, navgs, overlap=0.5,
-                 window='hanning', detrend='linear', scaling='density'):
+                 window='hamming', detrend='linear', scaling='density'):
     """
     Calculate an averaged power spectral density for a signal.
 
@@ -26,7 +96,7 @@ def averaged_psd(input_tsig, navgs, overlap=0.5,
     overlap : float (default 0.5)
         Percentage overlap between the averages
 
-    window : string (default 'hanning')
+    window : string (default 'hamming')
         The window type to use.
 
     detrend : string
@@ -56,7 +126,7 @@ def averaged_psd(input_tsig, navgs, overlap=0.5,
 
 
 def averaged_tf(input_tsig, output_tsig,
-                navgs, overlap=0.5, window='hanning', detrend='linear'):
+                navgs, overlap=0.5, window='hamming', detrend='linear'):
     """
     Calculate a transfer function between two signals, along with their
     coherence.
@@ -76,7 +146,7 @@ def averaged_tf(input_tsig, output_tsig,
     overlap : float (default 0.5)
         Percentage overlap between the averages
 
-    window : string (default 'hanning')
+    window : string (default 'hamming')
         The window type to use.
 
     detrend : string
@@ -282,7 +352,7 @@ def xcorr_delay(ts_in, ts_out, scaling='coeff'):
         The peak value of the cross correlation at the identified delay.
     """
     # Method 3: Cross Correlation
-    xcorr_i, lags = stats.correlation(ts_in, ts_out, scaling)
+    xcorr_i, lags = correlation(ts_in, ts_out, scaling)
     dt = (ts_in.index[1] - ts_in.index[0]).total_seconds()
     lags = lags * dt
     peak_lag_index = xcorr_i.argmax()  # Index of peak correlation

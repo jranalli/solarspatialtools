@@ -1,4 +1,4 @@
-from pytest import approx, fixture
+from pytest import approx, fixture, raises
 
 import numpy as np
 import pandas as pd
@@ -81,7 +81,16 @@ def test__calc_zone():
 def test_latlon2utm_sitecompare(olat, olon):
     # Value compared with MATLAB known good numbers
     (E, N, zone) = spatial.latlon2utm(olat, olon)
-    assert(E, N, zone) == approx((447464.9005, 5888516.6988, 32))
+    assert (E, N, zone) == approx((447464.9005, 5888516.6988, 32))
+
+
+def test_latlon2utm_failure(olat, olon):
+    latarray = np.array([olat, olat, olat])
+    lonarray = np.array([olon, olon, olon])
+    with raises(ValueError):
+        (E, N, zone) = spatial.latlon2utm(latarray, lonarray[0:2])
+    with raises(ValueError):
+        (E, N, zone) = spatial.latlon2utm(latarray[0:2], lonarray)
 
 
 def test_latlon2utm_arrayin(olat, olon):
@@ -171,6 +180,15 @@ def test_utm2latlon_sitecompare(olat, olon):
     # Value compared with MATLAB known good numbers
     (lat, lon) = spatial.utm2latlon(447464.9005, 5888516.6988, zone=32)
     assert (lat, lon) == approx((olat, olon))
+
+
+def test_utm2latlon_failure(olat, olon):
+    earray = np.array([447464.9005, 447464.9005, 447464.9005])
+    narray = np.array([5888516.6988, 5888516.6988, 5888516.6988])
+    with raises(ValueError):
+        spatial.utm2latlon(earray, narray[0:2], zone=32)
+    with raises(ValueError):
+        spatial.utm2latlon(earray[0:2], narray, zone=32)
 
 
 def test_utm2latlon_arrayin(olat, olon):
@@ -422,3 +440,58 @@ def test_compute_vectors_pandas(xypts, projected_dxdy):
     assert (vecs.index == ind).all()
     for veca, vecb in zip(np.array(vecs), projected_dxdy):
         assert veca == approx(vecb)
+
+
+@fixture(params=range(9))
+def data(request):
+    # [   (A),     (B),       (C)]
+    # [(Ax, Ay), (Bx, By)), (Cx, Cy)]
+    srcdata = [
+        [(1, 0), (0, 1),
+         (1, 1)],
+        # initial rotated -45 degrees
+        [(1/np.sqrt(2), 1/np.sqrt(2)), (1/np.sqrt(2), -1/np.sqrt(2)),
+         (np.sqrt(2), 0)],
+        # initial rotated +135 degrees
+        [(-1/np.sqrt(2), -1/np.sqrt(2)), (-1/np.sqrt(2), 1/np.sqrt(2)),
+         (-np.sqrt(2), 0)],
+        # initial case rotated -60 degrees
+        [(np.sqrt(3)/2, 1/2), (1/2, -np.sqrt(3)/2),
+         (np.sqrt(2)*np.cos(15*np.pi/180), -np.sqrt(2)*np.sin(15*np.pi/180))],
+        # Different lengths - Longer X
+        [(4, 0), (0, 1),
+         (4, 1)],
+        # Longer Y
+        [(1, 0), (0, 4),
+         (1, 4)],
+        # Longer X & Y
+        [(3, 0), (0, 4),
+         (3, 4)],
+        # 45 degrees separation
+        [(np.sqrt(2), 0), (1/np.sqrt(2), 1/np.sqrt(2)),
+         (np.sqrt(2), 0)],
+        # 60 degree separation evenly about x axis
+        [(np.sqrt(3), 1), (np.sqrt(3), -1),
+         (4/np.sqrt(3), 0)],
+    ]
+    return srcdata[request.param]
+
+
+@fixture(params=[1, 10])
+def n(request):
+    return request.param
+
+
+def test_compute_intersection(data, n):
+
+    A = data[0]
+    B = data[1]
+    expected = data[2]
+
+    A = np.repeat(np.array([A]), n, axis=0)
+    B = np.repeat(np.array([B]), n, axis=0)
+    expected = np.repeat(np.array([expected]), n, axis=0)
+
+    C = spatial.compute_intersection(A, B)
+
+    assert C == approx(expected)

@@ -63,6 +63,10 @@ A set of functions for calculating various quantities on datasets.
 - Quantile summary (e.g. for synthesizing a clear day from the 90th percentile 
 of each hour of the day over a 30 day window)
 
+```field```
+Functions for predicting the position of field components on the basis of cloud
+motion. 
+
 ## Common format for H5 files used for Data Storage
 
 I've tried to format the multisite time series measurements in a way that's 
@@ -112,6 +116,10 @@ site itself. This change breaks code!
 Add methods for calculating delay between signals to `signalproc`
 ##### Version 0.2.4
 Add some additional options to CMV code
+##### Version 0.2.5
+Add field analysis.
+##### Version 0.3.0
+A non-backwards-compatible major revision to incorporate field analysis and add more comprehensive testing.
 
 ## Author
 Joe Ranalli  
