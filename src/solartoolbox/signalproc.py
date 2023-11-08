@@ -362,6 +362,69 @@ def xcorr_delay(ts_in, ts_out, scaling='coeff'):
     return delay, xcorr_i[peak_lag_index]
 
 
+def compute_delays(ts_in, ts_out, mode='loop'):
+    lags = signal.correlation_lags(len(ts_in), len(ts_in))
+    dt = (ts_in.index[1] - ts_in.index[0]).total_seconds()
+    lags = lags * dt
+
+    ts_inm = ts_in - np.mean(ts_in)
+
+    ts_outm = np.array(ts_out)
+    mn = ts_outm.mean(axis=0)
+    ts_outm -= np.expand_dims(mn, axis=0)
+
+    if isinstance(ts_in, pd.DataFrame):
+        ts_inm = np.array(ts_inm).T
+    if isinstance(ts_out, pd.DataFrame):
+        ts_outm = np.array(ts_outm).T
+
+    if mode == 'loop':
+        # # XCORR SINGLE
+        delay = []
+        corrs = []
+        for i in range(ts_outm.shape[0]):
+            row = ts_outm[i, :]
+            xcorr = signal.correlate(ts_inm, row)
+            peak_lag_index = xcorr.argmax()
+            delay.append(-lags[peak_lag_index])
+            corrs.append(xcorr[peak_lag_index])
+        delay = np.array(delay)
+        corrs = np.array(corrs)
+        delay[corrs < 1e-10] = 0
+
+    elif mode == 'vector':
+        # XCORR MULTI
+        xcorr_i = np.flip(signal.correlate([ts_inm], ts_outm), axis=0)
+        peak_lag_indices = xcorr_i.argmax(axis=1)  # Index of peak correlation
+        delay = -lags[peak_lag_indices]
+        corrs = np.array([row[ind] for (row, ind) in zip(xcorr_i, peak_lag_indices)])
+        delay[corrs < 1e-10] = 0
+
+    elif mode == 'csd':
+        # CSD MULTI
+        freq, Pxy = scipy.signal.csd(ts_inm, ts_outm, fs=1/dt, nperseg=np.max(ts_inm.shape), detrend=None, return_onesided=False)
+        corrxy = np.abs(scipy.fft.ifft(Pxy))
+        tslen = corrxy.shape[1]
+        corrxy = np.roll(corrxy, tslen//2, axis=1)
+        flags = -np.array(range(-tslen//2,(tslen//2)))*dt
+        fpeak_lag_indices = corrxy.argmax(axis=1)  # Index of peak correlation
+        fdelay = -flags[fpeak_lag_indices]
+        fcorrs = np.array([row[ind] for (row, ind) in zip(corrxy, fpeak_lag_indices)])
+        fdelay[fcorrs < 1e-10] = 0
+        delay = fdelay
+        corrs = fcorrs
+
+    # import matplotlib.pyplot as plt
+    # # plt.plot(np.array(ts_out).T)
+    # plt.plot(lags, xcorr_i.T)
+    # plt.figure()
+    # plt.plot(flags, corrxy.T)
+    # plt.show()
+
+    return delay, corrs
+
+
+
 def apply_delay(tf, delay):
     """
     Apply a time delay to a transfer function. This is equivalent to rotating

@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from scipy import signal
 from scipy.interpolate import interp1d
-from solartoolbox.signalproc import averaged_psd, averaged_tf, interp_tf, tf_delay, xcorr_delay, apply_delay, correlation
+from solartoolbox.signalproc import averaged_psd, averaged_tf, interp_tf, tf_delay, xcorr_delay, apply_delay, correlation, compute_delays
 
 
 @pytest.fixture(params=[0, 0.2, -0.2, 0.4, -0.4, 1, -1])
@@ -234,10 +234,10 @@ def test_averaged_psd_multi():
 def test_averaged_tf_multi():
     np.random.seed(2023)
     # Create a simple sinusoidal signal
-    fs = 10  # sample rate
-    T = 5.0    # seconds
+    fs = 500  # sample rate
+    T = 1000.0    # seconds
     t = np.linspace(0, T, int(T*fs), endpoint=False)  # time variable
-    delay = 0.25
+    delay = 3
 
 
     x = 0.5 * np.sin(2 * np.pi * 2 * t) + np.random.random(len(t))
@@ -261,6 +261,20 @@ def test_averaged_tf_multi():
     # Seems like this works as long as you do a list of signals for the y, rather than a dataframe of signals.
     # If you have a dataframe of signals, you can convert by dff.values.T.tolist()
     ##########################
+    freqs, somePxy = signal.csd([x_tsig, ysigs[0], ysigs[1], ysigs[2]], ysigs, fs, window,
+               nperseg=len(x) // navgs,
+               noverlap=int(overlap * len(x) // navgs),
+               detrend=detrend)
+    freqs, somePxx = signal.welch([x_tsig, ysigs[0], ysigs[1], ysigs[2]], fs, window, nperseg=len(x)//navgs,
+                              noverlap=int(overlap*len(x)//navgs),
+                              detrend=detrend)
+    sometf_direct = somePxy / somePxx
+    import matplotlib.pyplot as plt
+    plt.plot(freqs, np.abs(sometf_direct).T)
+    plt.figure()
+    plt.plot(freqs, np.angle(sometf_direct).T)
+    plt.show()
+
 
     # Calculate the PSD directly using scipy.signal.welch
     # Calculate the transfer function directly using scipy csd and welch
@@ -297,9 +311,46 @@ def test_correlation_multi():
     corr = [correlation(x_tsig, y_tsig, scaling='none')[0] for y_tsig in ysigs]
     corr = np.array(corr)
 
-    c = signal.correlate([x_tsig], ysigs)
+    c = np.flip(signal.correlate([x_tsig], ysigs, method='fft'), axis=0)
 
-    assert np.allclose(corr, np.flip(c, axis=0))
+    assert np.allclose(corr, c)
+
+@pytest.fixture(params=['loop', 'vector','csd'])
+def compute_delays_modes(request):
+    return request.param
+
+
+@pytest.mark.parametrize("delay", [-200,-50.0, -25, -5, 0.0, 5, 25, 50,200])
+def test_compute_delays(delay, compute_delays_modes):
+    np.random.seed(2023)
+    # Create a simple sinusoidal signal
+    fs = 250  # sample rate
+    T = 500.0  # seconds
+    t = np.linspace(0, T, int(T * fs), endpoint=False)  # time variable
+    # delay = 0.25
+
+    x = 0.5 * np.sin(2 * np.pi * 2 * t) + 5*np.random.random(len(t))
+
+    ys = [x]
+    delay_ins = [0]
+    n = 50
+    for i in range(n):
+        deli = delay / n * i
+        yi = np.roll(x, int(deli * fs))
+        ys.append(yi)
+        delay_ins.append(deli)
+    # y2 = np.roll(x, int(2 * delay * fs))
+    # y3 = np.roll(x, int(3 * delay * fs))
+    # y4 = np.roll(x, int(4 * delay * fs))
+    #
+    # ys = [x, y1, y2, y3, y4]
+    x_tsig = pd.Series(x, index=pd.TimedeltaIndex(t, 's'))
+    ysigs = [pd.Series(y, index=pd.TimedeltaIndex(t, 's')) for y in ys]
+
+    delays, corrs = compute_delays(x_tsig, ysigs, compute_delays_modes)
+
+    assert np.allclose(delays, delay_ins)
+
 
 def test_correlation_illegal(corr_data):
     d, t, x1, x2, dly = corr_data
