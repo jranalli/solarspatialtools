@@ -118,7 +118,7 @@ Add methods for calculating delay between signals to `signalproc`
 Add some additional options to CMV code
 ##### Version 0.2.5
 Add field analysis.
-##### Version 0.3.0
+##### Version 0.3.1
 A non-backwards-compatible major revision to incorporate field analysis and add more comprehensive testing.
 
 ## Author
