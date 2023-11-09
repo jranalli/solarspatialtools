@@ -250,6 +250,14 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
     pair_flags.fill(Flag.GOOD)  # flags to show if this particular pair was bad
     overall_flag = None
 
+    # This is the alternative to looping over all the pairs
+    A = ts[pairs[:, 0]]
+    B = ts[pairs[:, 1]]
+
+    from solartoolbox import signalproc
+    delay, corr_csd = signalproc.compute_delays(A, B, 'csd')
+
+
     # Loop over all the pairs
     for i, pair in enumerate(pairs):
         # Get index of point within list and ids of the signals for this pair
