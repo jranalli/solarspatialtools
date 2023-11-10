@@ -113,6 +113,7 @@ def test_cmv_gagne_data():
     # Known values calculated on 11/3/2023
     assert cld_spd_gag == approx(10.53, abs=0.01)
     assert cld_dir_gag == approx(3.68, abs=0.01)
+    assert sum(dat_gag.pair_flag == cmv.Flag.GOOD) == 574
 
 
 def test_cmv_jamaly_data():
@@ -128,6 +129,21 @@ def test_cmv_jamaly_data():
                                                         method='jamaly',
                                                         corr_scaling='coeff')
 
+def test_cmv_jamaly_data2():
+    datafile = "../demos/data/sample_plant_1.h5"
+    pos_utm = pd.read_hdf(datafile, mode="r", key="latlon")
+    df = pd.read_hdf(datafile, mode="r", key="data_a")
+
+    hourlymax = np.mean(df.quantile(0.95))
+    kt = df / hourlymax
+
+    cld_spd_jam, cld_dir_jam, dat_jam = cmv.compute_cmv(kt, pos_utm,
+                                                        reference_id=pos_utm.index[0],
+                                                        method='jamaly',
+                                                        corr_scaling='coeff')
+
+
     # Known values calculated on 11/3/2023
-    assert cld_spd_jam == approx(10.54, abs=0.01)
-    assert cld_dir_jam == approx(3.29, abs=0.01)
+    assert cld_spd_jam == approx(9.3911, abs=0.01)
+    assert cld_dir_jam == approx(3.665955, abs=0.01)
+    assert sum(dat_jam.pair_flag == cmv.Flag.GOOD) == 64

@@ -240,67 +240,80 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
     dt = (timeseries.index[1] - timeseries.index[0]).total_seconds()
 
     # Set up output placeholders
-    corr_zero = np.zeros(npts)   # xcorr at no lag for this pair
-    corr_lag = np.zeros(npts)   # Peak xcorr allowing lag for this pair
-    corr_mean = np.zeros(npts)  # Mean xcorrelation for this pair at all times
-    corr_gain = np.zeros(npts)  # Xcorr gained by considering lag
-    delay = np.zeros(npts)      # Lag of peak xcorr
-    vectors_cart = np.zeros([npts, 2])  # vectors for each point pair
-    pair_flags = np.empty(npts, dtype=Flag)
-    pair_flags.fill(Flag.GOOD)  # flags to show if this particular pair was bad
-    overall_flag = None
+
+
+
 
     # This is the alternative to looping over all the pairs
     A = ts[pairs[:, 0]]
     B = ts[pairs[:, 1]]
 
     from solartoolbox import signalproc
-    delay, corr_csd = signalproc.compute_delays(A, B, 'csd')
+    delay, corr_lag, corr_mean, lags = signalproc.compute_delays(A, B, 'vector')
 
+    # corr_lag_old = np.zeros(npts)   # Peak xcorr allowing lag for this pair
+    # corr_mean_old = np.zeros(npts)  # Mean xcorrelation for this pair at all times
+    # delay_old = np.zeros(npts)
+    # # Loop over all the pairs
+    # for i_old, pair_old in enumerate(pairs):
+    #     # Get index of point within list and ids of the signals for this pair
+    #     pair_ind_old = i_old
+    #     ref_id_old = pair_old[0]
+    #     pt_id_old = pair_old[1]
+    #
+    #     # Pick out the reference signals
+    #     sig0_old = ts[ref_id_old]
+    #     sig1_old = ts[pt_id_old]
+    #
+    #     # Compute the site-pair cross correlation.
+    #     xcorr_i_old, lags_old = correlation(sig0_old, sig1_old, corr_scaling)
+    #     lags_old = lags_old * dt
+    #     peak_lag_index_old = xcorr_i_old.argmax()  # Index of peak correlation
+    #
+    #     # Extract the data for the various correlations
+    #     corr_lag_old[pair_ind_old] = xcorr_i_old[peak_lag_index_old]
+    #     delay_old[pair_ind_old] = -lags_old[peak_lag_index_old]  # Positive lag leads the ref
+    #     corr_mean_old[pair_ind_old] = np.mean(xcorr_i_old)
 
-    # Loop over all the pairs
+    # Vectors
+    vectors_cart = np.zeros([npts, 2])  # vectors for each point pair
     for i, pair in enumerate(pairs):
         # Get index of point within list and ids of the signals for this pair
         pair_ind = i
         ref_id = pair[0]
         pt_id = pair[1]
 
-        # Skip the case where they're the same point. No value in this corr.
-        if ref_id == pt_id:
-            pair_flags[pair_ind] = Flag.SAME
-            continue
+        # Compute vector between pair
+        ref_pt = np.array(positions.loc[ref_id])[0:2]
+        target_pt = np.array(positions.loc[pt_id])[0:2]
+        vec = compute_vectors([target_pt[0]], [target_pt[1]], ref_pt)[0]
+        vectors_cart[pair_ind] = vec
+
+    # Pairwise QC
+    pair_flags = np.empty(npts, dtype=Flag)
+    pair_flags.fill(Flag.GOOD)  # flags to show if this particular pair was bad
+    overall_flag = None
+    for i, pair in enumerate(pairs):
+        pair_ind = i
+        ref_id = pair[0]
+        pt_id = pair[1]
 
         # Pick out the reference signals
         sig0 = ts[ref_id]
         sig1 = ts[pt_id]
 
-        # Compute vector between pair
-        ref_pt = np.array(positions.loc[ref_id])[0:2]
-        target_pt = np.array(positions.loc[pt_id])[0:2]
-        vec = compute_vectors([target_pt[0]], [target_pt[1]], ref_pt)[0]
-        dist = magnitude(vec)
-
-        # Compute the site-pair cross correlation.
-        xcorr_i, lags = correlation(sig0, sig1, corr_scaling)
-        lags = lags * dt
-        peak_lag_index = xcorr_i.argmax()  # Index of peak correlation
-
-        # Extract the data for the various correlations
-        corr_zero[pair_ind] = xcorr_i[lags == 0]
-        corr_lag[pair_ind] = xcorr_i[peak_lag_index]
-        delay[pair_ind] = -lags[peak_lag_index]  # Positive lag leads the ref
-        corr_mean[pair_ind] = np.mean(xcorr_i)
-        corr_gain[pair_ind] = corr_lag[pair_ind] - np.abs(corr_zero[pair_ind])
-        vectors_cart[pair_ind] = vec
-
         # ##### Pairwise QC ##### #
+        # Skip the case where they're the same point. No value in this corr.
+        if ref_id == pt_id:
+            pair_flags[pair_ind] = Flag.SAME
+            continue
 
         # Base STD rejects faulty sensors with no variance at all
         if np.std(sig0) < 0.001 or np.std(sig1) < 0.001:
             pair_flags[pair_ind] = Flag.NOSIGNAL
             continue
         # Zero lag Reject sensor pairs with no delay
-        if lags[peak_lag_index] == 0:
+        if delay[pair_ind] == 0:
             pair_flags[pair_ind] = Flag.NOLAG
             continue
 
@@ -331,9 +344,9 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
 
             # Jamaly and Kleissl - require minimum lagged xcorr and minimum
             # cross correlation ratio
-            r_qc = 1 - np.mean(xcorr_i) / np.max(xcorr_i)
+            r_qc = 1 - corr_mean[pair_ind] / corr_lag[pair_ind]
             method_out['r_qc'].append(r_qc)
-            if np.max(xcorr_i) < 0.8 or r_qc < 0.8:
+            if corr_lag[pair_ind] < 0.8 or r_qc < 0.8:
                 pair_flags[pair_ind] = Flag.LOWCORR
                 continue
 
@@ -345,7 +358,7 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
             max_lag_fraction = 1  # fraction of timeseries for max lag
             max_lag = np.abs(np.max(lags)) * max_lag_fraction  # max dt allowed
             if (delay[pair_ind] > max_lag or
-                    not (min_v < np.abs(dist/lags[peak_lag_index]) < max_v)):
+                    not (min_v < np.abs(magnitude(vectors_cart[pair_ind])/delay[pair_ind]) < max_v)):
                 pair_flags[pair_ind] = Flag.VELLIMIT
                 continue
 
@@ -453,12 +466,10 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
     outdata.flag = overall_flag
     outdata.pair_flag = pair_flags
     outdata.pair_lag = delay
-    outdata.corr_raw = corr_zero
     outdata.allpairs = pairs
     outdata.corr_lag = corr_lag
     outdata.pair_dists = cmv_dir_dist
     outdata.vectors = vectors_cart
-    outdata.corr_gain = corr_gain
     outdata.wind_angle = cmv_theta
     outdata.wind_speed = cmv_vel
     outdata.method_data = method_out

@@ -362,7 +362,7 @@ def xcorr_delay(ts_in, ts_out, scaling='coeff'):
     return delay, xcorr_i[peak_lag_index]
 
 
-def compute_delays(ts_in, ts_out, mode='loop'):
+def compute_delays(ts_in, ts_out, mode='loop', scaling='coeff'):
     lags = signal.correlation_lags(len(ts_in), len(ts_in))
     dt = (ts_in.index[1] - ts_in.index[0]).total_seconds()
     lags = lags * dt
@@ -378,31 +378,47 @@ def compute_delays(ts_in, ts_out, mode='loop'):
     if isinstance(ts_out, pd.DataFrame):
         ts_outm = np.array(ts_outm).T
 
+    if scaling == 'coeff':
+        ts_inm = ts_inm - np.expand_dims(np.mean(ts_inm, axis=1), axis=1)
+        ts_outm = ts_outm - np.expand_dims(np.mean(ts_outm, axis=1), axis=1)
+        scale = 1/(np.size(ts_inm, axis=1) * np.std(ts_inm, axis=1) * np.std(ts_outm, axis=1))
+        # num = scipy.signal.correlate(baseline - np.mean(baseline),
+        #                              estimation - np.mean(estimation))
+        # den = len(baseline) * (np.std(baseline) * np.std(estimation))
+        # corr = num / den
+
+    else:
+        scale = 1
+
     if mode == 'loop':
         # # XCORR SINGLE
         delay = []
         corrs = []
+        meancorrs = []
         for i in range(ts_outm.shape[0]):
-            row = ts_outm[i, :]
-            xcorr = signal.correlate(ts_inm, row)
+            # row = ts_outm[i, :]
+            xcorr = signal.correlate(ts_inm[i,:], ts_outm[i,:])
             peak_lag_index = xcorr.argmax()
             delay.append(-lags[peak_lag_index])
             corrs.append(xcorr[peak_lag_index])
+            meancorrs.append(np.mean(xcorr))
         delay = np.array(delay)
         corrs = np.array(corrs)
+        meancorrs = np.array(meancorrs)
         delay[corrs < 1e-10] = 0
 
     elif mode == 'vector':
         # XCORR MULTI
-        xcorr_i = np.flip(signal.correlate([ts_inm], ts_outm), axis=0)
+        xcorr_i = np.flip(signal.correlate(np.expand_dims(ts_inm[0,:], axis=0), ts_outm), axis=0)
         peak_lag_indices = xcorr_i.argmax(axis=1)  # Index of peak correlation
         delay = -lags[peak_lag_indices]
         corrs = np.array([row[ind] for (row, ind) in zip(xcorr_i, peak_lag_indices)])
+        meancorrs = np.mean(xcorr_i, axis=1)
         delay[corrs < 1e-10] = 0
 
     elif mode == 'csd':
         # CSD MULTI
-        freq, Pxy = scipy.signal.csd(ts_inm, ts_outm, fs=1/dt, nperseg=np.max(ts_inm.shape), detrend=None, return_onesided=False)
+        freq, Pxy = scipy.signal.csd(ts_inm, ts_outm, fs=1/dt, nperseg=np.max(ts_inm.shape), window='boxcar', detrend=None, return_onesided=False, scaling='spectrum')
         corrxy = np.abs(scipy.fft.ifft(Pxy))
         tslen = corrxy.shape[1]
         corrxy = np.roll(corrxy, tslen//2, axis=1)
@@ -411,8 +427,22 @@ def compute_delays(ts_in, ts_out, mode='loop'):
         fdelay = -flags[fpeak_lag_indices]
         fcorrs = np.array([row[ind] for (row, ind) in zip(corrxy, fpeak_lag_indices)])
         fdelay[fcorrs < 1e-10] = 0
+
+        # import matplotlib.pyplot as plt
+        # plt.plot(lags, xcorr_i[115:125,:].T)
+        # plt.figure()
+        # plt.plot(flags, corrxy[115:125,:].T)
+        # plt.figure()
+        # plt.plot(delay, fdelay, '.')
+        # plt.show()
+        #
+
         delay = fdelay
         corrs = fcorrs
+        lags = flags
+        meancorrs = np.mean(corrxy, axis=1)
+        corrs = corrs/np.max(corrs * scale)
+        meancorrs = meancorrs/np.max(corrs * scale)
 
     # import matplotlib.pyplot as plt
     # # plt.plot(np.array(ts_out).T)
@@ -420,8 +450,10 @@ def compute_delays(ts_in, ts_out, mode='loop'):
     # plt.figure()
     # plt.plot(flags, corrxy.T)
     # plt.show()
+    corrs = corrs*scale
+    meancorrs = meancorrs*scale
 
-    return delay, corrs
+    return delay, corrs, meancorrs, lags
 
 
 
