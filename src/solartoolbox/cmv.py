@@ -249,7 +249,7 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
     B = ts[pairs[:, 1]]
 
     from solartoolbox import signalproc
-    delay, corr_lag, corr_mean, lags = signalproc.compute_delays(A, B, 'vector')
+    delay, corr_lag, corr_mean, lags = signalproc.compute_delays(A, B, 'fft')
 
     # corr_lag_old = np.zeros(npts)   # Peak xcorr allowing lag for this pair
     # corr_mean_old = np.zeros(npts)  # Mean xcorrelation for this pair at all times

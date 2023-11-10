@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from scipy import signal
 from scipy.interpolate import interp1d
-from solartoolbox.signalproc import averaged_psd, averaged_tf, interp_tf, tf_delay, xcorr_delay, apply_delay, correlation, compute_delays
+from solartoolbox.signalproc import averaged_psd, averaged_tf, interp_tf, tf_delay, xcorr_delay, apply_delay, correlation, compute_delays, fftcorrelate
 
 
 @pytest.fixture(params=[0, 0.2, -0.2, 0.4, -0.4, 1, -1])
@@ -51,6 +51,25 @@ def test_correlation_illegal(corr_data):
     d, t, x1, x2, dly = corr_data
     with raises(ValueError):
         c, lag = correlation(x1, x2, scaling="illegal")
+
+@pytest.mark.parametrize("scaling", ['coeff', 'none'])
+def test_fftcorrelate_identity(corr_data, scaling):
+    dt, t, x1, x2, dly = corr_data
+    c = fftcorrelate(x1, x1, scaling)
+    cr, lag = correlation(x1, x1, scaling=scaling)
+    # import matplotlib.pyplot as plt
+    # plt.plot(c)
+    # plt.plot(cr)
+    # plt.show()
+    assert np.allclose(c, cr)
+
+@pytest.mark.parametrize("scaling", ['coeff', 'none'])
+def test_fftcorrelate_shift(corr_data, scaling):
+    d, t, x1, x2, dly = corr_data
+    c = fftcorrelate(x1, x2, scaling)
+    cr, lag = correlation(x1, x2, scaling=scaling)
+    assert np.allclose(c, cr)
+
 
 
 def test_averaged_psd():

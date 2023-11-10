@@ -81,6 +81,30 @@ def correlation(baseline, estimation, scaling='coeff'):
     return corr, lags
 
 
+def _fftcorrelate(baseline, estimation, scaling='coeff'):
+    if scaling == 'coeff':
+        baseline -= np.mean(baseline)
+        estimation -= np.mean(estimation)
+        den = len(baseline) * (np.std(baseline) * np.std(estimation))
+    elif scaling == 'none':
+        den = 1
+    else:
+        raise ValueError(f"Illegal scaling specified: {scaling}.")
+
+    # zero pad by nA+nB-1
+    nl = len(baseline) + len(estimation) - 1
+    baseline = np.pad(baseline, (0, nl-len(baseline)), 'constant')
+    estimation = np.pad(estimation, (0, nl-len(estimation)), 'constant')
+    ffta = np.fft.fft(baseline)
+    fftb = np.fft.fft(estimation)
+    corr = np.real(np.fft.ifft(ffta * np.conj(fftb)))
+    corr = np.roll(corr, nl//2)
+
+    corr /= den
+    return corr
+
+
+
 def averaged_psd(input_tsig, navgs, overlap=0.5,
                  window='hamming', detrend='linear', scaling='density'):
     """
@@ -416,7 +440,29 @@ def compute_delays(ts_in, ts_out, mode='loop', scaling='coeff'):
         meancorrs = np.mean(xcorr_i, axis=1)
         delay[corrs < 1e-10] = 0
 
+    elif mode == 'fft':
+        na = np.size(ts_inm, axis=1)
+        nb = np.size(ts_outm, axis=1)
+        nl = na + nb - 1
+        addon = np.zeros((ts_inm.shape[0], nl - na))
+        ts_inm = np.append(ts_inm, addon, axis=1)
+        ts_outm = np.append(ts_outm, addon, axis=1)
+        ffta = np.fft.fft(ts_inm, axis=1)
+        fftb = np.fft.fft(ts_outm, axis=1)
+        corrxy = np.real(np.fft.ifft(ffta * np.conj(fftb), axis=1))
+        corrxy = np.roll(corrxy, nl // 2, axis=1)
+        meancorrs = np.mean(corrxy, axis=1)
+
+        fpeak_lag_indices = corrxy.argmax(axis=1)  # Index of peak correlation
+        fdelay = -lags[fpeak_lag_indices]
+        fcorrs = np.array([row[ind] for (row, ind) in zip(corrxy, fpeak_lag_indices)])
+        fdelay[fcorrs < 1e-10] = 0
+
+        delay = fdelay
+        corrs = fcorrs
+
     elif mode == 'csd':
+
         # CSD MULTI
         freq, Pxy = scipy.signal.csd(ts_inm, ts_outm, fs=1/dt, nperseg=np.max(ts_inm.shape), window='boxcar', detrend=None, return_onesided=False, scaling='spectrum')
         corrxy = np.abs(scipy.fft.ifft(Pxy))
