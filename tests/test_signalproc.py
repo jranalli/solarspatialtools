@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from scipy import signal
 from scipy.interpolate import interp1d
-from solartoolbox.signalproc import averaged_psd, averaged_tf, interp_tf, tf_delay, xcorr_delay, apply_delay, correlation, compute_delays, fftcorrelate
+from solartoolbox.signalproc import averaged_psd, averaged_tf, interp_tf, tf_delay, xcorr_delay, apply_delay, correlation, compute_delays, _fftcorrelate
 
 
 @pytest.fixture(params=[0, 0.2, -0.2, 0.4, -0.4, 1, -1])
@@ -55,7 +55,7 @@ def test_correlation_illegal(corr_data):
 @pytest.mark.parametrize("scaling", ['coeff', 'none'])
 def test_fftcorrelate_identity(corr_data, scaling):
     dt, t, x1, x2, dly = corr_data
-    c = fftcorrelate(x1, x1, scaling)
+    c = _fftcorrelate(x1, x1, scaling)
     cr, lag = correlation(x1, x1, scaling=scaling)
     # import matplotlib.pyplot as plt
     # plt.plot(c)
@@ -66,7 +66,7 @@ def test_fftcorrelate_identity(corr_data, scaling):
 @pytest.mark.parametrize("scaling", ['coeff', 'none'])
 def test_fftcorrelate_shift(corr_data, scaling):
     d, t, x1, x2, dly = corr_data
-    c = fftcorrelate(x1, x2, scaling)
+    c = _fftcorrelate(x1, x2, scaling)
     cr, lag = correlation(x1, x2, scaling=scaling)
     assert np.allclose(c, cr)
 
@@ -334,7 +334,7 @@ def test_correlation_multi():
 
     assert np.allclose(corr, c)
 
-@pytest.fixture(params=['loop', 'vector','csd'])
+@pytest.fixture(params=['loop', 'fft'])
 def compute_delays_modes(request):
     return request.param
 
@@ -365,13 +365,9 @@ def test_compute_delays(delay, compute_delays_modes):
     # ys = [x, y1, y2, y3, y4]
     x_tsig = pd.Series(x, index=pd.TimedeltaIndex(t, 's'))
     ysigs = [pd.Series(y, index=pd.TimedeltaIndex(t, 's')) for y in ys]
+    xsigs = [x_tsig for y in ys]
+    xsigs = pd.DataFrame(np.array(xsigs).T, index=x_tsig.index)
 
-    delays, corrs = compute_delays(x_tsig, ysigs, compute_delays_modes)
+    delays, corrs, _, _ = compute_delays(xsigs, ysigs, compute_delays_modes)
 
     assert np.allclose(delays, delay_ins)
-
-
-def test_correlation_illegal(corr_data):
-    d, t, x1, x2, dly = corr_data
-    with raises(ValueError):
-        c, lag = correlation(x1, x2, scaling="illegal")

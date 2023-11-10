@@ -249,31 +249,33 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
     B = ts[pairs[:, 1]]
 
     from solartoolbox import signalproc
-    delay, corr_lag, corr_mean, lags = signalproc.compute_delays(A, B, 'fft')
+    delay, corr_lag, corr_mean, lags = signalproc.compute_delays(A, B, 'loop')
 
-    # corr_lag_old = np.zeros(npts)   # Peak xcorr allowing lag for this pair
-    # corr_mean_old = np.zeros(npts)  # Mean xcorrelation for this pair at all times
-    # delay_old = np.zeros(npts)
+
+    # # Old method
+    # corr_lag = np.zeros(npts)   # Peak xcorr allowing lag for this pair
+    # corr_mean = np.zeros(npts)  # Mean xcorrelation for this pair at all times
+    # delay = np.zeros(npts)
     # # Loop over all the pairs
-    # for i_old, pair_old in enumerate(pairs):
+    # for i, pair in enumerate(pairs):
     #     # Get index of point within list and ids of the signals for this pair
-    #     pair_ind_old = i_old
-    #     ref_id_old = pair_old[0]
-    #     pt_id_old = pair_old[1]
+    #     pair_ind = i
+    #     ref_id = pair[0]
+    #     pt_id = pair[1]
     #
     #     # Pick out the reference signals
-    #     sig0_old = ts[ref_id_old]
-    #     sig1_old = ts[pt_id_old]
+    #     sig0 = ts[ref_id]
+    #     sig1 = ts[pt_id]
     #
     #     # Compute the site-pair cross correlation.
-    #     xcorr_i_old, lags_old = correlation(sig0_old, sig1_old, corr_scaling)
-    #     lags_old = lags_old * dt
-    #     peak_lag_index_old = xcorr_i_old.argmax()  # Index of peak correlation
+    #     xcorr_i, lags = correlation(sig0, sig1, corr_scaling)
+    #     lags = lags * dt
+    #     peak_lag_index = xcorr_i.argmax()  # Index of peak correlation
     #
     #     # Extract the data for the various correlations
-    #     corr_lag_old[pair_ind_old] = xcorr_i_old[peak_lag_index_old]
-    #     delay_old[pair_ind_old] = -lags_old[peak_lag_index_old]  # Positive lag leads the ref
-    #     corr_mean_old[pair_ind_old] = np.mean(xcorr_i_old)
+    #     corr_lag[pair_ind] = xcorr_i[peak_lag_index]
+    #     delay[pair_ind] = -lags[peak_lag_index]  # Positive lag leads the ref
+    #     corr_mean[pair_ind] = np.mean(xcorr_i)
 
     # Vectors
     vectors_cart = np.zeros([npts, 2])  # vectors for each point pair
@@ -475,3 +477,37 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
     outdata.method_data = method_out
 
     return cmv_vel, cmv_theta, outdata
+
+
+def _perform_qc(A,B,method='jamaly',options=None):
+    """
+    Perform QC on the CMV signals
+    """
+
+    # Validate method
+    methods = ['jamaly', 'gagne']
+    method = method.lower()
+    if method not in methods:
+        raise ValueError('Method must be one of: ' + str(methods) + '.')
+
+    # Validate options
+    if options is None:
+        options = {}
+    # Specify default options by method
+    if method == 'jamaly':
+        defaults = {'minvelocity': 0,  # m/s
+                    'maxvelocity': 70  # m/s (about 160 mph)
+                    }
+        method_out = {
+                    'error_index': None,  # The Error Index
+                    'velocity': None,  # Velocity for each pair
+                    'v60': None,  # 60th percentile velocity
+                    'v40': None,  # 40th percentile velocity
+                    'r_qc': [],  # Ratio of peak to mean xcorr
+                    'var_s': [],  # Variation ratio of signals [s0, s1]
+                      }
+    if method == 'gagne':
+        defaults = {}
+        method_out = {
+            'pcov': None,  # Covariance matrix from least squares
+        }

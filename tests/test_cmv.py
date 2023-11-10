@@ -129,6 +129,10 @@ def test_cmv_jamaly_data():
                                                         method='jamaly',
                                                         corr_scaling='coeff')
 
+    assert cld_spd_jam == approx(10.54, abs=0.01)
+    assert cld_dir_jam == approx(3.29, abs=0.01)
+    assert sum(dat_jam.pair_flag == cmv.Flag.GOOD) == 12709
+
 def test_cmv_jamaly_data2():
     datafile = "../demos/data/sample_plant_1.h5"
     pos_utm = pd.read_hdf(datafile, mode="r", key="latlon")
