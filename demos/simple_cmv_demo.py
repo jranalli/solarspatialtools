@@ -37,12 +37,10 @@ kt = ts.apply(lambda x:
 # Compute the cloud motion vector using both methods
 cld_spd_gag, cld_dir_gag, dat_gag = cmv.compute_cmv(kt, pos_utm,
                                                     reference_id=None,
-                                                    method='gagne',
-                                                    corr_scaling='coeff')
+                                                    method='gagne')
 cld_spd_jam, cld_dir_jam, dat_jam = cmv.compute_cmv(kt, pos_utm,
                                                     reference_id=None,
-                                                    method='jamaly',
-                                                    corr_scaling='coeff')
+                                                    method='jamaly')
 
 # Print the answer
 print("Method  Spd    Angle  N_good")

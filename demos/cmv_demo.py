@@ -13,12 +13,10 @@ kt = df / hourlymax
 
 cld_spd_gag, cld_dir_gag, dat_gag = cmv.compute_cmv(kt, pos_utm,
                                                     reference_id=None,
-                                                    method='gagne',
-                                                    corr_scaling='coeff')
+                                                    method='gagne')
 cld_spd_jam, cld_dir_jam, dat_jam = cmv.compute_cmv(kt, pos_utm,
                                                     reference_id=None,
-                                                    method='jamaly',
-                                                    corr_scaling='coeff')
+                                                    method='jamaly')
 
 print("Method     Speed  Angle:rad  Angle:°   N_good")
 print(f"Gagne   {cld_spd_gag:8.2f} {cld_dir_gag:10.2f} {np.rad2deg(cld_dir_gag):8.2f} {sum(dat_gag.pair_flag == cmv.Flag.GOOD):8,}")
