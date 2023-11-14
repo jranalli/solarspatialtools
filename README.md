@@ -120,6 +120,8 @@ Add some additional options to CMV code
 Add field analysis.
 ##### Version 0.3.1
 A non-backwards-compatible major revision to incorporate field analysis and add more comprehensive testing.
+##### Version 0.3.2
+A non-backwards-compatible major revision to create a major speedup on the CMV.
 
 ## Author
 Joe Ranalli  
