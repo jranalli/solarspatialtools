@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.optimize import minimize_scalar, leastsq
 
-from solartoolbox.signalproc import correlation
+from solartoolbox.signalproc import compute_delays
 from solartoolbox.spatial import project_vectors, compute_vectors
 from solartoolbox.spatial import pol2rect, magnitude
 
@@ -44,7 +44,6 @@ class WindspeedData:
     """
     corr_raw = None  # Zero-lag cross-correlations relative to ref point
     corr_lag = None  # Max-lag cross-correlation
-    corr_gain = None  # Gain in cross-correlation by allowing lag
     allpairs = None  # Points used for windspeed measurement
     pair_lag = None  # Point-wise maximum lag
     pair_dists = None  # Point-wise distance to reference in m
@@ -52,7 +51,6 @@ class WindspeedData:
     wind_angle = None  # Wind dir in radians
     pair_flag = None
     flag = None  # A data quality flag
-    vectors = None
     method_data = None  # A holder for method-specific data
 
 
@@ -108,7 +106,7 @@ def _get_pairs(all_points, must_contain=None, replacement=True):
 
 
 def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
-                corr_scaling='coeff', options=None):
+                options=None):
     """
     Find Cloud Motion Vector based on clear sky index timeseries from a cluster
     of sensors using the method by Jamaly and Kleissl [1]. An alternate method
@@ -139,12 +137,8 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
     method : str (default 'jamaly')
         Method to use. Currently accepted methods are 'jamaly' and 'gagne'
 
-    corr_scaling : str (default 'coeff')
-        Scaling for correlation. Choices are 'energy' and 'coeff'. Coeff
-        scaling automatically normalizes to the mean of the timeseries.
-
     options : dict (default {})
-        Dictionary of detailed arguments for the methods.
+        Dictionary of detailed QC arguments for the methods.
             Jamaly:
                 minvelocity : float (default 0 m/s)
                     Minimum permissible pairwise velocity in m/s
@@ -179,38 +173,6 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
     if method not in methods:
         raise ValueError('Method must be one of: ' + str(methods) + '.')
 
-    # Validate options
-    if options is None:
-        options = {}
-    # Specify default options by method
-    if method == 'jamaly':
-        defaults = {'minvelocity': 0,  # m/s
-                    'maxvelocity': 70  # m/s (about 160 mph)
-                    }
-        method_out = {
-                    'error_index': None,  # The Error Index
-                    'velocity': None,  # Velocity for each pair
-                    'v60': None,  # 60th percentile velocity
-                    'v40': None,  # 40th percentile velocity
-                    'r_qc': [],  # Ratio of peak to mean xcorr
-                    'var_s': [],  # Variation ratio of signals [s0, s1]
-                      }
-    if method == 'gagne':
-        defaults = {}
-        method_out = {
-            'pcov': None,  # Covariance matrix from least squares
-        }
-
-    # Validate option keys are part of method
-    for key in options:
-        if key not in defaults:
-            raise ValueError(f'Invalid option for {method}: ' + str(key) + '.')
-
-    # Build out options with defaults if they're not specified
-    for key in defaults:
-        if key not in options:
-            options[key] = defaults[key]
-
     # Ignore some numpy printouts, we'll deal with them manually
     np.seterr(divide='ignore')
     np.seterr(invalid='ignore')
@@ -233,144 +195,32 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
 
     # Get all possible point pairs
     pairs = _get_pairs(point_ids, ref_ids, replacement=True)
-    npts = len(pairs)
 
     # Get some parameters about the time series
     ts = timeseries  # Shorten the name for simplicity
-    dt = (timeseries.index[1] - timeseries.index[0]).total_seconds()
-
-    # Set up output placeholders
-
-
-
 
     # This is the alternative to looping over all the pairs
     A = ts[pairs[:, 0]]
     B = ts[pairs[:, 1]]
 
-    from solartoolbox import signalproc
-    delay, corr_lag, corr_mean, lags = signalproc.compute_delays(A, B, 'loop')
-
-
-    # # Old method
-    # corr_lag = np.zeros(npts)   # Peak xcorr allowing lag for this pair
-    # corr_mean = np.zeros(npts)  # Mean xcorrelation for this pair at all times
-    # delay = np.zeros(npts)
-    # # Loop over all the pairs
-    # for i, pair in enumerate(pairs):
-    #     # Get index of point within list and ids of the signals for this pair
-    #     pair_ind = i
-    #     ref_id = pair[0]
-    #     pt_id = pair[1]
-    #
-    #     # Pick out the reference signals
-    #     sig0 = ts[ref_id]
-    #     sig1 = ts[pt_id]
-    #
-    #     # Compute the site-pair cross correlation.
-    #     xcorr_i, lags = correlation(sig0, sig1, corr_scaling)
-    #     lags = lags * dt
-    #     peak_lag_index = xcorr_i.argmax()  # Index of peak correlation
-    #
-    #     # Extract the data for the various correlations
-    #     corr_lag[pair_ind] = xcorr_i[peak_lag_index]
-    #     delay[pair_ind] = -lags[peak_lag_index]  # Positive lag leads the ref
-    #     corr_mean[pair_ind] = np.mean(xcorr_i)
+    # We always need to calculate the correlations using correlation coeff.
+    # scaling, because it matters for various QC checks.
+    delay, extras = compute_delays(A, B, 'loop', scaling='coeff')
+    corr_lag = extras['peak_corr']
+    corr_mean = extras['mean_corr']
 
     # Vectors
-    vectors_cart = np.zeros([npts, 2])  # vectors for each point pair
-    for i, pair in enumerate(pairs):
-        # Get index of point within list and ids of the signals for this pair
-        pair_ind = i
-        ref_id = pair[0]
-        pt_id = pair[1]
-
-        # Compute vector between pair
-        ref_pt = np.array(positions.loc[ref_id])[0:2]
-        target_pt = np.array(positions.loc[pt_id])[0:2]
-        vec = compute_vectors([target_pt[0]], [target_pt[1]], ref_pt)[0]
-        vectors_cart[pair_ind] = vec
+    vectors_cart = (positions.loc[pairs[:, 1]].values
+                    - positions.loc[pairs[:, 0]].values)
 
     # Pairwise QC
-    pair_flags = np.empty(npts, dtype=Flag)
-    pair_flags.fill(Flag.GOOD)  # flags to show if this particular pair was bad
-    overall_flag = None
-    for i, pair in enumerate(pairs):
-        pair_ind = i
-        ref_id = pair[0]
-        pt_id = pair[1]
-
-        # Pick out the reference signals
-        sig0 = ts[ref_id]
-        sig1 = ts[pt_id]
-
-        # ##### Pairwise QC ##### #
-        # Skip the case where they're the same point. No value in this corr.
-        if ref_id == pt_id:
-            pair_flags[pair_ind] = Flag.SAME
-            continue
-
-        # Base STD rejects faulty sensors with no variance at all
-        if np.std(sig0) < 0.001 or np.std(sig1) < 0.001:
-            pair_flags[pair_ind] = Flag.NOSIGNAL
-            continue
-        # Zero lag Reject sensor pairs with no delay
-        if delay[pair_ind] == 0:
-            pair_flags[pair_ind] = Flag.NOLAG
-            continue
-
-        if method == 'jamaly':
-            # Jamaly and Kleissl - low variation ratio
-            # var_s_lim = 0.1  # Jamaly and Kleissl limit
-            var_s_lim = 0.05  # TODO Justify Override Jamaly value
-            var_s0 = 1 - np.nanmean(sig0) / np.nanmax(sig0)
-            var_s1 = 1 - np.nanmean(sig1) / np.nanmax(sig1)
-            method_out['var_s'].append([var_s0, var_s1])
-            if var_s0 < var_s_lim or var_s1 < var_s_lim:
-                pair_flags[pair_ind] = Flag.LOWVAR_S
-                continue
-
-            # # Jamaly and Kleissl - low cloud cover fraction (i.e. too clear)
-            # ccf_lim = 0.1  # More than 10% of points should have kt < 0.85
-            # ccf0 = np.nansum(sig0 < 0.85) / len(sig0)  # Fraction of kt<0.85
-            # ccf1 = np.nansum(sig1 < 0.85) / len(sig1)
-            # if ccf0 < ccf_lim or ccf1 < ccf_lim:
-            #     pair_flags[pair_ind] = Flag.LOWCCF
-            #     continue
-
-            # Ranalli - extremely overcast
-            ktlim = 0.4
-            if np.nanmax(sig0) < ktlim and np.nanmax(sig1) < 0.4:
-                pair_flags[pair_ind] = Flag.OVERCAST
-                continue
-
-            # Jamaly and Kleissl - require minimum lagged xcorr and minimum
-            # cross correlation ratio
-            r_qc = 1 - corr_mean[pair_ind] / corr_lag[pair_ind]
-            method_out['r_qc'].append(r_qc)
-            if corr_lag[pair_ind] < 0.8 or r_qc < 0.8:
-                pair_flags[pair_ind] = Flag.LOWCORR
-                continue
-
-            # Jamaly and Kleissl distance limit is confusing; I modified here
-            # Original appears to require that the max velocity be less than
-            # 1 m/s I implement it as a literal velocity limit rather than dist
-            min_v = options['minvelocity']  # m/s (could be introduced)
-            max_v = options['maxvelocity']  # m/s (70 m/s, around 160 mph)
-            max_lag_fraction = 1  # fraction of timeseries for max lag
-            max_lag = np.abs(np.max(lags)) * max_lag_fraction  # max dt allowed
-            if (delay[pair_ind] > max_lag or
-                    not (min_v < np.abs(magnitude(vectors_cart[pair_ind])/delay[pair_ind]) < max_v)):
-                pair_flags[pair_ind] = Flag.VELLIMIT
-                continue
-
-        elif method == 'gagne':
-            pass  # Gagne QC isn't pairwise
-
-    # Done looping over pairs, begin to compute the aggregate performance
+    pair_flags, method_out = _pairwise_qc(pairs, magnitude(vectors_cart.T),
+                                          [A, B], delay, corr_lag, corr_mean,
+                                          method, options)
 
     # Perform the Gagne QC, which looks for correlation on the whole set to
     # decide which pairs are worth using
+    overall_flag = None
     if method == 'gagne':
         corr_inds = corr_lag >= 0.99
         if sum(corr_inds[pair_flags == Flag.GOOD]) < 12:
@@ -443,9 +293,8 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
             # Residual as defined in Gagne 2018 equation 3
             return lag - (dx * ax + dy * ay)
 
-        [ax_opt, ay_opt], pcov = leastsq(resid, [1, 1],
+        [ax_opt, ay_opt], pcov = leastsq(resid, np.array([1, 1]),
                                          args=(delay_good, vectors_good))
-
         method_out['pcov'] = pcov
 
         # Gagne 2018 equation 4
@@ -454,6 +303,8 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
 
         cmv_vel = magnitude([vx, vy])
         cmv_theta = np.arctan2(vy, vx)
+    else:
+        raise ValueError('Invalid method: ' + str(method) + '.')
 
     # Make velocity always positive and change distances to accommodate
     if cmv_vel < 0:
@@ -471,7 +322,6 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
     outdata.allpairs = pairs
     outdata.corr_lag = corr_lag
     outdata.pair_dists = cmv_dir_dist
-    outdata.vectors = vectors_cart
     outdata.wind_angle = cmv_theta
     outdata.wind_speed = cmv_vel
     outdata.method_data = method_out
@@ -479,35 +329,164 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
     return cmv_vel, cmv_theta, outdata
 
 
-def _perform_qc(A,B,method='jamaly',options=None):
+def _pairwise_qc(pairs, spacing, sigs, delay, peak_corr, mean_corr,
+                 method, options=None):
     """
-    Perform QC on the CMV signals
+    Perform pairwise QC on the CMV signals according to method
+
+    Parameters
+    ----------
+    pairs : np.array
+        An N x 2 numpy array containing all the combination pairs.
+    spacing : np.array
+        An array of the distances between each pair in meters
+    sigs : list of np.array
+        A list of the two signals to be compared
+    delay : np.array
+        An array of the delays between each pair in seconds
+    peak_corr : np.array
+        An array of the peak cross-correlation between each pair
+    mean_corr : np.array
+        An array of the mean cross-correlation between each pair
+    method : str
+        The method to use for QC. Currently accepted methods are 'jamaly' and
+        'gagne'
+    options : dict or None
+        A dictionary of options for the QC. See _validate_method_options for
+        details
     """
+    # Validate the options
+    options, method_out = _validate_method_options(method, options)
 
-    # Validate method
-    methods = ['jamaly', 'gagne']
-    method = method.lower()
-    if method not in methods:
-        raise ValueError('Method must be one of: ' + str(methods) + '.')
+    A, B = sigs
 
+    # Initialize the flags for all the pairs
+    npts = A.shape[1]
+    pair_flags = np.empty(npts, dtype=Flag)
+    pair_flags.fill(Flag.GOOD)
+
+    # Global QC Common to all Methods
+
+    # Same sensor lag and correlation is meaningless
+    same_ind = pairs[:, 0] == pairs[:, 1]
+    pair_flags[same_ind] = Flag.SAME
+
+    # Base STD rejects faulty sensors with no variance at all, possibly bad
+    # sensor data?
+    siginds = np.bitwise_or(np.nanstd(A, axis=0) < 0.001,
+                            np.nanstd(B, axis=0) < 0.001)
+    pair_flags[siginds] = Flag.NOSIGNAL
+
+    # Zero lag Reject sensor pairs with no delay
+    pair_flags[delay == 0] = Flag.NOLAG
+
+    # Signals are extremely overcast
+    ktlim = options['ktlim']
+    ktinds = np.bitwise_or(np.nanmax(A, axis=0) < ktlim,
+                           np.nanmax(B, axis=0) < ktlim)
+    pair_flags[ktinds] = Flag.OVERCAST
+
+    # Method-specific QC
+    if method == 'jamaly':
+        # Jamaly and Kleissl - low variation ratio
+        var_s_lim = options['var_s_lim']
+        var_s0 = 1 - np.nanmean(A, axis=0) / np.nanmax(A, axis=0)
+        var_s1 = 1 - np.nanmean(B, axis=0) / np.nanmax(B, axis=0)
+        method_out['var_s'] = [var_s0, var_s1]
+        var_s_inds = np.bitwise_or(var_s0 < var_s_lim, var_s1 < var_s_lim)
+        pair_flags[var_s_inds] = Flag.LOWVAR_S
+
+        # # Jamaly and Kleissl - low cloud cover fraction (i.e. too clear)
+        # ccf_lim = 0.1  # More than 10% of points should have kt < 0.85
+        # ccf0 = np.nansum(sig0 < 0.85) / len(sig0)  # Fraction of kt<0.85
+        # ccf1 = np.nansum(sig1 < 0.85) / len(sig1)
+        # if ccf0 < ccf_lim or ccf1 < ccf_lim:
+        #     pair_flags[pair_ind] = Flag.LOWCCF
+        #     continue
+
+        # Jamaly and Kleissl - require minimum lagged xcorr and minimum
+        # cross correlation ratio
+        r_qc = 1 - mean_corr / peak_corr
+        corr_min = options['mincorr']
+        method_out['r_qc'] = r_qc
+        corr_inds = np.bitwise_or(peak_corr < corr_min, r_qc < corr_min)
+        pair_flags[corr_inds] = Flag.LOWCORR
+
+        # Jamaly and Kleissl distance limit is confusing; I modified here
+        # Original appears to require that the max velocity be less than
+        # 1 m/s I implement it as a literal velocity limit rather than dist
+        min_v = options['minvelocity']  # m/s (could be introduced)
+        max_v = options['maxvelocity']  # m/s (70 m/s, around 160 mph)
+        v = spacing/delay
+        vind = np.bitwise_not(np.bitwise_and(min_v < np.abs(v),
+                                             np.abs(v) < max_v))
+        pair_flags[vind] = Flag.VELLIMIT
+
+    elif method == 'gagne':
+        pass  # No pairwise QC
+
+    return pair_flags, method_out
+
+
+def _validate_method_options(method, options):
+    """
+    Validate and fill defaults for an options dictionary for the various CMV
+    methods.
+
+    Parameters
+    ----------
+    method : str
+        The method to validate options for. Currently accepted methods are:
+        'jamaly' and 'gagne'.
+    options : dict
+        The options dictionary to validate. If None, a default dictionary will
+        be created.
+
+    Returns
+    -------
+    options : dict
+        The validated options dictionary filled with defaults as applicable.
+    method_out : dict
+        A dictionary of method-specific output data. This is used to store
+        intermediate data for debugging purposes.
+    """
     # Validate options
     if options is None:
         options = {}
     # Specify default options by method
     if method == 'jamaly':
         defaults = {'minvelocity': 0,  # m/s
-                    'maxvelocity': 70  # m/s (about 160 mph)
+                    'maxvelocity': 70,  # m/s (about 160 mph)
+                    'var_s_lim': 0.05,  # 0.10 in original paper
+                    'ktlim': 0.4,
+                    'mincorr': 0.8
                     }
         method_out = {
-                    'error_index': None,  # The Error Index
-                    'velocity': None,  # Velocity for each pair
-                    'v60': None,  # 60th percentile velocity
-                    'v40': None,  # 40th percentile velocity
-                    'r_qc': [],  # Ratio of peak to mean xcorr
-                    'var_s': [],  # Variation ratio of signals [s0, s1]
-                      }
-    if method == 'gagne':
-        defaults = {}
+            'error_index': None,  # The Error Index
+            'velocity': None,  # Velocity for each pair
+            'v60': None,  # 60th percentile velocity
+            'v40': None,  # 40th percentile velocity
+            'r_qc': [],  # Ratio of peak to mean xcorr
+            'var_s': [],  # Variation ratio of signals [s0, s1]
+        }
+    elif method == 'gagne':
+        defaults = {
+            'ktlim': 0.4,
+        }
         method_out = {
             'pcov': None,  # Covariance matrix from least squares
         }
+    else:
+        raise ValueError('Invalid method: ' + str(method) + '.')
+
+    # Validate option keys are valid for method
+    for key in options:
+        if key not in defaults:
+            raise ValueError(f'Invalid option for {method}: ' + str(key) + '.')
+
+    # Apply defaults if option not specified
+    for key in defaults:
+        if key not in options:
+            options[key] = defaults[key]
+
+    return options, method_out

@@ -33,16 +33,16 @@ def test_cmv_artificial(theta_deg, velocity, mode):
     # The reference point is 4
     # The CMV is 1m/s at 45°
     # The expected result is 1m/s at 45°
-    pos_utm = pd.DataFrame(index=range(9), columns=['E', 'N'])
-    spacing = 10
+    pos_utm = pd.DataFrame(index=range(9), columns=['E', 'N'], dtype=float)
+    spacing = 10.0
     pos_utm.loc[0] = [-spacing, -spacing]
-    pos_utm.loc[1] = [0, -spacing]
+    pos_utm.loc[1] = [0.0, -spacing]
     pos_utm.loc[2] = [spacing, -spacing]
-    pos_utm.loc[3] = [-spacing, 0]
-    pos_utm.loc[4] = [0, 0]
-    pos_utm.loc[5] = [spacing, 0]
+    pos_utm.loc[3] = [-spacing, 0.0]
+    pos_utm.loc[4] = [0.0, 0.0]
+    pos_utm.loc[5] = [spacing, 0.0]
     pos_utm.loc[6] = [-spacing, spacing]
-    pos_utm.loc[7] = [0, spacing]
+    pos_utm.loc[7] = [0.0, spacing]
     pos_utm.loc[8] = [spacing, spacing]
 
     # Velocity direction
@@ -81,8 +81,7 @@ def test_cmv_artificial(theta_deg, velocity, mode):
     # Compute the CMV
     cld_spd, cld_dir, dat = cmv.compute_cmv(df, pos_utm,
                                             reference_id=4,
-                                            method=mode,
-                                            corr_scaling='coeff')
+                                            method=mode)
 
     # Convert the dir to positive angle, because compute_cmv is always pos
     if theta < 0:
@@ -107,8 +106,7 @@ def test_cmv_gagne_data():
 
     cld_spd_gag, cld_dir_gag, dat_gag = cmv.compute_cmv(kt, pos_utm,
                                                         reference_id=None,
-                                                        method='gagne',
-                                                        corr_scaling='coeff')
+                                                        method='gagne')
 
     # Known values calculated on 11/3/2023
     assert cld_spd_gag == approx(10.53, abs=0.01)
@@ -126,14 +124,15 @@ def test_cmv_jamaly_data():
 
     cld_spd_jam, cld_dir_jam, dat_jam = cmv.compute_cmv(kt, pos_utm,
                                                         reference_id=None,
-                                                        method='jamaly',
-                                                        corr_scaling='coeff')
+                                                        method='jamaly')
 
     assert cld_spd_jam == approx(10.54, abs=0.01)
     assert cld_dir_jam == approx(3.29, abs=0.01)
     assert sum(dat_jam.pair_flag == cmv.Flag.GOOD) == 12709
 
-def test_cmv_jamaly_data2():
+def test_cmv_jamaly_data_ref():
+    # A test using a reference when we calculate the CMV
+
     datafile = "../demos/data/sample_plant_1.h5"
     pos_utm = pd.read_hdf(datafile, mode="r", key="latlon")
     df = pd.read_hdf(datafile, mode="r", key="data_a")
@@ -143,8 +142,7 @@ def test_cmv_jamaly_data2():
 
     cld_spd_jam, cld_dir_jam, dat_jam = cmv.compute_cmv(kt, pos_utm,
                                                         reference_id=pos_utm.index[0],
-                                                        method='jamaly',
-                                                        corr_scaling='coeff')
+                                                        method='jamaly')
 
 
     # Known values calculated on 11/3/2023

@@ -369,10 +369,9 @@ def project_vectors(vectors, dir_vector):
         pandas_mode = False
         vec_array = vectors
 
-    dot_positions = []
-    for vec in vec_array:
-        dot_positions.append(dot(vec, unit(dir_vector)))
-    dot_positions = np.array(dot_positions)
+    unit_dir = unit(dir_vector)
+    v = np.array(vec_array)
+    dot_positions = v[:, 0] * unit_dir[0] + v[:, 1] * unit_dir[1]
 
     if pandas_mode:
         return pd.DataFrame(dot_positions,

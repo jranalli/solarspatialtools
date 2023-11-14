@@ -387,6 +387,39 @@ def xcorr_delay(ts_in, ts_out, scaling='coeff'):
 
 
 def compute_delays(ts_in, ts_out, mode='loop', scaling='coeff'):
+    """
+    Compute the delay between two sets of timeseries using cross correlation.
+    Uses similar methodologies to xcorr_delay, but allows for multiple input
+    timeseries to be computed simultaneously.
+
+    Parameters
+    ----------
+    ts_in: pd.DataFrame
+    ts_out: pd.DataFrame
+    mode: str (default 'loop')
+        The method to use for computing the delay. Options are:
+            'loop' - loop over each input timeseries pair and compute the xcorr
+            'fft' - use the fft to compute the xcorr (seems to be slower)
+    scaling: str (default 'coeff')
+        Type of scaling to use for cross correlation. Note that debiased
+        scaling options are not available here. Valid options are:
+        'coeff' - computes the correlation coefficient
+        'none' - no scaling is applied
+
+    Returns
+    -------
+    delay : array(float)
+        Time lag between the two timeseries at the maximum value of the cross
+        correlation. Values are always integer multiples of the sampling period
+        as the max correlation values are limited to the discrete time steps.
+    corr : array(float)
+        The peak value of the cross correlation at the identified delay.
+    extra_data : dict{} or None
+        if compute_extras was true, additional info will be returned. Fields
+        are:
+            'mean_corr' - the mean correlation for each input timeseries
+            'zero_zorr' - the correlation at zero_lag for each input timeseries
+    """
     lags = signal.correlation_lags(len(ts_in), len(ts_in))
     dt = (ts_in.index[1] - ts_in.index[0]).total_seconds()
     lags = lags * dt
@@ -398,67 +431,81 @@ def compute_delays(ts_in, ts_out, mode='loop', scaling='coeff'):
     if isinstance(ts_out, pd.DataFrame):
         ts_outm = np.array(ts_outm).T
 
+    extras = {'peak_corr': np.zeros(ts_inm.shape[0]),
+              'mean_corr': np.zeros(ts_inm.shape[0]),
+              'zero_corr': np.zeros(ts_inm.shape[0])
+              }
+    zero_lag_ind = np.where(lags == 0)
+
+    # Perform the scaling calculations
     if scaling == 'coeff':
+        # Subtract means
         ts_inm = ts_inm - np.expand_dims(np.mean(ts_inm, axis=1), axis=1)
         ts_outm = ts_outm - np.expand_dims(np.mean(ts_outm, axis=1), axis=1)
-        scale = 1/(np.size(ts_inm, axis=1) * np.std(ts_inm, axis=1) * np.std(ts_outm, axis=1))
+        # Compute the scaling factor (normalizing by stdev)
+        corr_scale = (np.size(ts_inm, axis=1)
+                      * np.std(ts_inm, axis=1)
+                      * np.std(ts_outm, axis=1)) ** -1
     elif scaling == 'none':
-        scale = 1
+        corr_scale = 1
     else:
         raise ValueError(f"Illegal scaling specified: {scaling}.")
 
     if mode == 'loop':
-        # # XCORR SINGLE
-        delay = []
-        corrs = []
-        meancorrs = []
-        for i in range(ts_outm.shape[0]):
-            xcorr = signal.correlate(ts_inm[i,:], ts_outm[i,:])
-            # xcorr, _ = correlation(ts_inm[i,:], ts_outm[i,:], 'none')
-            peak_lag_index = xcorr.argmax()
-            delay.append(-lags[peak_lag_index])
-            corrs.append(xcorr[peak_lag_index])
-            meancorrs.append(np.mean(xcorr))
-        delay = np.array(delay)
-        corrs = np.array(corrs)
-        meancorrs = np.array(meancorrs)
-        delay[corrs < 1e-10] = 0
+        # signal.correlate can't handle 2D inputs without performing 2D conv.
 
-    elif mode == 'vector':
-        # Only works when you have the same vector for all inputs
-        xcorr_i = np.flip(signal.correlate(np.expand_dims(ts_inm[0,:], axis=0), ts_outm), axis=0)
-        peak_lag_indices = xcorr_i.argmax(axis=1)  # Index of peak correlation
-        delay = -lags[peak_lag_indices]
-        corrs = np.array([row[ind] for (row, ind) in zip(xcorr_i, peak_lag_indices)])
-        meancorrs = np.mean(xcorr_i, axis=1)
-        delay[corrs < 1e-10] = 0
+        # Precomputing method saves time
+        method = signal.choose_conv_method(ts_inm[0, :], ts_outm[0, :])
+
+        # Preallocate and Compute for individual pairs
+        delay = np.zeros(ts_inm.shape[0])
+        for i in range(ts_outm.shape[0]):
+            xcorr = signal.correlate(ts_inm[i, :], ts_outm[i, :],
+                                     method=method)
+            # xcorr, _ = correlation(ts_inm[i, :], ts_outm[i, :], 'none')
+            peak_lag_index = xcorr.argmax()
+            delay[i] = -lags[peak_lag_index]
+
+            extras['peak_corr'][i] = xcorr[peak_lag_index]
+            extras['mean_corr'][i] = np.mean(xcorr)
+            extras['zero_corr'][i] = xcorr[zero_lag_ind]
+
+        # Scale
+        extras['peak_corr'] *= corr_scale
+        extras['mean_corr'] *= corr_scale
+        extras['zero_corr'] *= corr_scale
 
     elif mode == 'fft':
+        # Have to pad with zeros to get equivalent vals to normal xcorr.
         na = np.size(ts_inm, axis=1)
-        nb = np.size(ts_outm, axis=1)
-        nl = na + nb - 1
+        nl = 2*na - 1
         addon = np.zeros((ts_inm.shape[0], nl - na))
-        ts_inm = np.append(ts_inm, addon, axis=1)
-        ts_outm = np.append(ts_outm, addon, axis=1)
+        ts_inm = np.concatenate([ts_inm, addon], axis=1)
+        ts_outm = np.concatenate([ts_outm, addon], axis=1)
+
+        # Need to recompute the lags to accommodate the shifted zero for fft
+        lags = np.roll(lags, -nl // 2 + 1)
+        zero_lag_ind = np.where(lags == 0)
+
+        # Compute correlation via fft and re-center to match lags
         ffta = scipy.fft.fft(ts_inm, axis=1)
         fftb = scipy.fft.fft(ts_outm, axis=1)
         corrxy = np.real(np.fft.ifft(ffta * np.conj(fftb), axis=1))
-        corrxy = np.roll(corrxy, nl // 2, axis=1)
-        meancorrs = np.mean(corrxy, axis=1)
 
-        fpeak_lag_indices = corrxy.argmax(axis=1)  # Index of peak correlation
-        fdelay = -lags[fpeak_lag_indices]
-        fcorrs = np.array([row[ind] for (row, ind) in zip(corrxy, fpeak_lag_indices)])
-        fdelay[fcorrs < 1e-10] = 0
+        # Extract value and lag of peak correlation
+        peak_lag_indices = corrxy.argmax(axis=1)
+        delay = -lags[peak_lag_indices]
 
-        delay = fdelay
-        corrs = fcorrs
+        extras['peak_corr'] = corrxy[range(ts_inm.shape[0]), peak_lag_indices] * corr_scale
+        extras['mean_corr'] = np.mean(corrxy, axis=1) * corr_scale
+        extras['zero_corr'] = corrxy[:, zero_lag_ind] * corr_scale
+    else:
+        raise ValueError(f'Invalid mode: {mode}')
 
-    corrs = corrs*scale
-    meancorrs = meancorrs*scale
+    # Sometimes produce erroneous delay for uncorrelated values
+    delay[extras['peak_corr'] < 1e-10] = 0
 
-    return delay, corrs, meancorrs, lags
-
+    return delay, extras
 
 
 def apply_delay(tf, delay):
