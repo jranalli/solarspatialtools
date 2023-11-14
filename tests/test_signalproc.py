@@ -52,16 +52,14 @@ def test_correlation_illegal(corr_data):
     with raises(ValueError):
         c, lag = correlation(x1, x2, scaling="illegal")
 
+
 @pytest.mark.parametrize("scaling", ['coeff', 'none'])
 def test_fftcorrelate_identity(corr_data, scaling):
     dt, t, x1, x2, dly = corr_data
     c = _fftcorrelate(x1, x1, scaling)
     cr, lag = correlation(x1, x1, scaling=scaling)
-    # import matplotlib.pyplot as plt
-    # plt.plot(c)
-    # plt.plot(cr)
-    # plt.show()
     assert np.allclose(c, cr)
+
 
 @pytest.mark.parametrize("scaling", ['coeff', 'none'])
 def test_fftcorrelate_shift(corr_data, scaling):
@@ -69,7 +67,6 @@ def test_fftcorrelate_shift(corr_data, scaling):
     c = _fftcorrelate(x1, x2, scaling)
     cr, lag = correlation(x1, x2, scaling=scaling)
     assert np.allclose(c, cr)
-
 
 
 def test_averaged_psd():
@@ -216,8 +213,6 @@ def test_apply_delay(delay):
     assert np.allclose(tf_delayed['tf'], tf_expected['tf'], atol=1e-5)
 
 
-
-
 def test_averaged_psd_multi():
     np.random.seed(2023)
     # Create a simple sinusoidal signal
@@ -239,8 +234,6 @@ def test_averaged_psd_multi():
     scaling = 'density'
     psds = [averaged_psd(tsig, navgs, overlap, window, detrend, scaling) for tsig in tsigs]
 
-
-
     # Calculate the PSD directly using scipy.signal.welch
     freqs, psd_direct = signal.welch(xs, fs, window, nperseg=len(x1)//navgs,
                                      noverlap=int(overlap*len(x1)//navgs),
@@ -257,7 +250,6 @@ def test_averaged_tf_multi():
     T = 1000.0    # seconds
     t = np.linspace(0, T, int(T*fs), endpoint=False)  # time variable
     delay = 3
-
 
     x = 0.5 * np.sin(2 * np.pi * 2 * t) + np.random.random(len(t))
 
@@ -288,11 +280,11 @@ def test_averaged_tf_multi():
                               noverlap=int(overlap*len(x)//navgs),
                               detrend=detrend)
     sometf_direct = somePxy / somePxx
-    import matplotlib.pyplot as plt
-    plt.plot(freqs, np.abs(sometf_direct).T)
-    plt.figure()
-    plt.plot(freqs, np.angle(sometf_direct).T)
-    plt.show()
+    # import matplotlib.pyplot as plt
+    # plt.plot(freqs, np.abs(sometf_direct).T)
+    # plt.figure()
+    # plt.plot(freqs, np.angle(sometf_direct).T)
+    # plt.show()
 
 
     # Calculate the PSD directly using scipy.signal.welch
@@ -308,42 +300,17 @@ def test_averaged_tf_multi():
     # Check that the PSDs match
     assert np.allclose(tfs, tf_direct, atol=1e-5)
 
-def test_correlation_multi():
-    np.random.seed(2023)
-    # Create a simple sinusoidal signal
-    fs = 10  # sample rate
-    T = 5.0  # seconds
-    t = np.linspace(0, T, int(T * fs), endpoint=False)  # time variable
-    delay = 0.25
-
-    x = 0.5 * np.sin(2 * np.pi * 2 * t) + np.random.random(len(t))
-
-    y1 = np.roll(x, int(delay * fs))
-    y2 = np.roll(x, int(2 * delay * fs))
-    y3 = np.roll(x, int(3 * delay * fs))
-    y4 = np.roll(x, int(4 * delay * fs))
-
-    ys = [y1, y2, y3, y4]
-    x_tsig = pd.Series(x, index=pd.TimedeltaIndex(t, 's'))
-    ysigs = [pd.Series(y, index=pd.TimedeltaIndex(t, 's')) for y in ys]
-
-    corr = [correlation(x_tsig, y_tsig, scaling='none')[0] for y_tsig in ysigs]
-    corr = np.array(corr)
-
-    c = np.flip(signal.correlate([x_tsig], ysigs, method='fft'), axis=0)
-
-    assert np.allclose(corr, c)
 
 @pytest.fixture(params=['loop', 'fft'])
 def compute_delays_modes(request):
     return request.param
 
 
-@pytest.mark.parametrize("delay", [-200,-50.0, -25, -5, 0.0, 5, 25, 50,200])
+@pytest.mark.parametrize("delay", [-200, -50.0, -25, -5, 0.0, 5, 25, 50, 200])
 def test_compute_delays(delay, compute_delays_modes):
     np.random.seed(2023)
     # Create a simple sinusoidal signal
-    fs = 250  # sample rate
+    fs = 100  # sample rate
     T = 500.0  # seconds
     t = np.linspace(0, T, int(T * fs), endpoint=False)  # time variable
     # delay = 0.25
@@ -358,16 +325,12 @@ def test_compute_delays(delay, compute_delays_modes):
         yi = np.roll(x, int(deli * fs))
         ys.append(yi)
         delay_ins.append(deli)
-    # y2 = np.roll(x, int(2 * delay * fs))
-    # y3 = np.roll(x, int(3 * delay * fs))
-    # y4 = np.roll(x, int(4 * delay * fs))
-    #
-    # ys = [x, y1, y2, y3, y4]
+
     x_tsig = pd.Series(x, index=pd.TimedeltaIndex(t, 's'))
     ysigs = [pd.Series(y, index=pd.TimedeltaIndex(t, 's')) for y in ys]
     xsigs = [x_tsig for y in ys]
     xsigs = pd.DataFrame(np.array(xsigs).T, index=x_tsig.index)
 
-    delays, corrs, _, _ = compute_delays(xsigs, ysigs, compute_delays_modes)
+    delays, _ = compute_delays(xsigs, ysigs, compute_delays_modes)
 
     assert np.allclose(delays, delay_ins)

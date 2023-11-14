@@ -412,8 +412,6 @@ def compute_delays(ts_in, ts_out, mode='loop', scaling='coeff'):
         Time lag between the two timeseries at the maximum value of the cross
         correlation. Values are always integer multiples of the sampling period
         as the max correlation values are limited to the discrete time steps.
-    corr : array(float)
-        The peak value of the cross correlation at the identified delay.
     extra_data : dict{} or None
         if compute_extras was true, additional info will be returned. Fields
         are:
