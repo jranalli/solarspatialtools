@@ -56,17 +56,19 @@ def test_correlation_illegal(corr_data):
 @pytest.mark.parametrize("scaling", ['coeff', 'none'])
 def test_fftcorrelate_identity(corr_data, scaling):
     dt, t, x1, x2, dly = corr_data
-    c = _fftcorrelate(x1, x1, scaling)
+    c, l = _fftcorrelate(x1, x1, scaling)
     cr, lag = correlation(x1, x1, scaling=scaling)
     assert np.allclose(c, cr)
+    assert np.allclose(l, lag)
 
 
 @pytest.mark.parametrize("scaling", ['coeff', 'none'])
 def test_fftcorrelate_shift(corr_data, scaling):
     d, t, x1, x2, dly = corr_data
-    c = _fftcorrelate(x1, x2, scaling)
+    c, l = _fftcorrelate(x1, x2, scaling)
     cr, lag = correlation(x1, x2, scaling=scaling)
     assert np.allclose(c, cr)
+    assert np.allclose(l, lag)
 
 
 def test_averaged_psd():
