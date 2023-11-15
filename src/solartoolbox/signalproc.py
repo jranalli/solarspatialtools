@@ -192,13 +192,21 @@ def averaged_psd(input_tsig, navgs, overlap=0.5,
     dt = (input_tsig.index[1] - input_tsig.index[0]).total_seconds()
     fs = 1/dt
 
-    nperseg = int(len(input_tsig) // navgs)
+    if isinstance(input_tsig, pd.Series):
+        return averaged_psd(pd.DataFrame(input_tsig), navgs, overlap, window, detrend)
+
+    cols = input_tsig.columns
+    input_tsig = input_tsig.values.T
+
+
+    nperseg = int(input_tsig.shape[1] // navgs)
     noverlap = int(nperseg * overlap)
+
     f, psdxx = signal.welch(input_tsig, fs=fs, window=window,
                             nperseg=nperseg, detrend=detrend,
                             noverlap=noverlap, scaling=scaling)
     # Reported units from scipy are V**2/Hz
-    return pd.Series(psdxx, index=f)
+    return pd.DataFrame(psdxx.T, index=f, columns=cols)
 
 
 def averaged_tf(input_tsig, output_tsig,
@@ -238,29 +246,64 @@ def averaged_tf(input_tsig, output_tsig,
             'tf' - the complex transfer function
             'coh' - the coherence
     """
-
     dt = (input_tsig.index[1] - input_tsig.index[0]).total_seconds()
     fs = 1/dt
 
-    nperseg = int(len(input_tsig) // navgs)
+    if isinstance(output_tsig, pd.Series):
+        return averaged_tf(input_tsig, pd.DataFrame(output_tsig),
+                           navgs, overlap, window, detrend)
+    if isinstance(input_tsig, pd.Series):
+        return averaged_tf(pd.DataFrame(input_tsig), output_tsig, navgs, overlap, window, detrend)
+
+    if not (isinstance(output_tsig, pd.DataFrame) and isinstance(input_tsig, pd.DataFrame)):
+        raise ValueError('Input and output timesignals must be pandas types')
+
+    out_cols = output_tsig.columns
+    in_cols = input_tsig.columns
+    output_tsig = output_tsig.values.T
+    input_tsig = input_tsig.values.T
+
+    if len(out_cols) == len(in_cols):
+        cols = [f"{in_cols[i]}_{out_cols[i]}" for i in range(len(out_cols))]
+    elif len(out_cols) == 1:
+        cols = [f"{in_cols[i]}_{out_cols[0]}" for i in range(len(in_cols))]
+    elif len(in_cols) == 1:
+        cols = [f"{in_cols[0]}_{out_cols[i]}" for i in range(len(out_cols))]
+    else:
+        raise RuntimeError("Shouldn't Be Possible")
+
+
+
+    nperseg = int(input_tsig.shape[1] // navgs)
     noverlap = int(nperseg * overlap)
 
     # Calculate the transfer function
-    psdxx = averaged_psd(input_tsig, window=window, navgs=navgs,
-                         detrend=detrend, overlap=overlap, scaling='density')
-    _, csdxy = signal.csd(input_tsig, output_tsig, fs=fs, window=window,
+    _, psdxx = signal.welch(input_tsig, fs=fs, window=window,
+                          nperseg=nperseg, detrend=detrend,
+                          noverlap=noverlap, scaling='density')
+    _, psdyy = signal.welch(output_tsig, fs=fs, window=window,
+                          nperseg=nperseg, detrend=detrend,
+                          noverlap=noverlap, scaling='density')
+    freqs, csdxy = signal.csd(input_tsig, output_tsig, fs=fs, window=window,
                           nperseg=nperseg, detrend=detrend,
                           noverlap=noverlap)
+
+    # try:
     tf = csdxy / psdxx
+    coh = np.abs(csdxy) ** 2 / (psdxx * psdyy)
+    # except ValueError:
+    #     tf = csdxy.T / np.expand_dims(psdxx, axis=1)
+    #     coh = np.abs(csdxy) ** 2 / (np.expand_dims(psdxx, axis=1) * psdyy)
 
     # Calculate the coherence
-    _, coh = signal.coherence(input_tsig, output_tsig, fs=fs, window=window,
-                              nperseg=nperseg, noverlap=noverlap,
-                              detrend=detrend)
+    # _, coh = signal.coherence(input_tsig, output_tsig, fs=fs, window=window,
+    #                           nperseg=nperseg, noverlap=noverlap,
+    #                           detrend=detrend)
 
-    output = pd.DataFrame({'tf': tf, 'coh': coh}, index=psdxx.index)
+    tf = pd.DataFrame(tf.T, index=freqs, columns=cols)
+    coh = pd.DataFrame(coh.T, index=freqs, columns=cols)
 
-    return output
+    return tf, coh
 
 
 def interp_tf(new_freq, input_tf):
@@ -316,7 +359,7 @@ def interp_tf(new_freq, input_tf):
     return interp_filt
 
 
-def tf_delay(tf, coh_limit=0.6, freq_limit=0.02, method='fit'):
+def tf_delay(tf, coh, coh_limit=0.6, freq_limit=0.02, method='fit'):
     """
     Compute the delay based on the phase of a transfer function
 
@@ -346,7 +389,7 @@ def tf_delay(tf, coh_limit=0.6, freq_limit=0.02, method='fit'):
         if coh_limit is None:
             ix1 = np.ones_like(tf.index, dtype=bool)
         else:
-            ix1 = tf['coh'] > coh_limit
+            ix1 = (coh.values > coh_limit).flatten()
         if freq_limit is None:
             ix2 = np.ones_like(tf.index, dtype=bool)
         else:
@@ -380,7 +423,7 @@ def tf_delay(tf, coh_limit=0.6, freq_limit=0.02, method='fit'):
 
         try:
             return curve_fit(delay_fitter, tf.index[ix],
-                             np.unwrap(np.angle(tf['tf'][ix])))[0], ix
+                             np.unwrap(np.angle(tf.loc[ix]).flatten()))[0], ix
         except ValueError:
             from warnings import warn
             if not ix.any():
