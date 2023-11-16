@@ -188,20 +188,20 @@ def compute_delays(df, ref, navgs=5, coh_limit=0.6, freq_limit=0.02):
     # Compute delay for every point pair for this reference
     delay = np.zeros_like(df.columns, dtype=float)
     coh = np.zeros_like(df.columns, dtype=float)
-    ts_in = df[ref]
-    for i, point in enumerate(df.columns):
-        ts_out = df[point]
 
-        # Compute TF
-        tf, tfcoh = signalproc.averaged_tf(ts_in, ts_out, navgs=navgs, overlap=0.5,
-                                    window='hamming', detrend=None)
+    tf, tfcoh = signalproc.averaged_tf(df[ref], df, navgs=navgs, overlap=0.5,
+                                       window='hamming', detrend=None)
+    for i, col in enumerate(tf.columns):
+        tf_i = tf[col]
+        coh_i = tfcoh[col]
+
         # Find the time delay from the TF phase
-        delay[i], ix = signalproc.tf_delay(tf, tfcoh,
+        delay[i], ix = signalproc.tf_delay(tf_i, coh_i,
                                            coh_limit=coh_limit,
                                            freq_limit=freq_limit)
 
         # How good was the coherence? Average across TF
-        tfsub = tfcoh[tf.index < freq_limit]
+        tfsub = coh_i[tf.index < freq_limit]
         coh[i] = np.sum(tfsub.values) / len(tfsub)
         # coh[i] = np.sum(tf['coh']) / len(tf['coh'])  # Alt average of all TF
 
