@@ -247,17 +247,17 @@ def test_apply_delay(delay):
     phase = -2 * np.pi * freqs * delay  # phase delay
     mag = np.ones_like(freqs)  # magnitude
     coh = np.ones_like(freqs)  # coherence
-    tf = pd.DataFrame({'tf': mag * np.exp(1j * phase), 'coh': coh}, index=freqs)
+    tf = pd.DataFrame({'tf': mag * np.exp(1j * phase)}, index=freqs)
 
     # Apply the delay using the function
     tf_delayed = apply_delay(tf, delay)
 
     # Calculate the expected delayed transfer function
-    tf_expected = tf.copy()
-    tf_expected['tf'] = tf['tf'] * np.exp(2 * np.pi * 1j * tf.index * -delay)
+    tf_expected = tf.copy().values.flatten()
+    tf_expected = tf_expected * np.exp(2 * np.pi * 1j * tf.index * -delay)
 
     # Check that the delayed transfer function matches the expected one
-    assert np.allclose(tf_delayed['tf'], tf_expected['tf'], atol=1e-5)
+    assert np.allclose(tf_delayed, tf_expected, atol=1e-5)
 
 
 def test_averaged_psd_multi():
