@@ -3,7 +3,7 @@ import pandas as pd
 import scipy.signal
 from scipy import signal
 from scipy.interpolate import interp1d
-from scipy.optimize import curve_fit
+from scipy.optimize import curve_fit, leastsq
 
 from solartoolbox import spatial
 
@@ -385,31 +385,34 @@ def tf_delay(tf, coh, coh_limit=0.6, freq_limit=0.02, method='fit'):
         The delay in seconds
 
     """
-    try:
-        if coh_limit is None:
-            ix1 = np.ones_like(tf.index, dtype=bool)
-        else:
-            ix1 = (coh.values > coh_limit).flatten()
-        if freq_limit is None:
-            ix2 = np.ones_like(tf.index, dtype=bool)
-        else:
-            ix2 = tf.index < freq_limit
-        ix = np.bitwise_and(ix1, ix2)
-    except KeyError:
-        from warnings import warn
-        warn('No coherence column found, using all points.')
-        ix = np.ones_like(tf.index, dtype=bool)
+    if coh_limit is None:
+        ix_coh = np.ones_like(coh, dtype=bool)
+    else:
+        ix_coh = (coh.values > coh_limit)
+    if freq_limit is None:
+        ix_freq = np.ones_like(tf, dtype=bool)
+    else:
+        ix_freq = np.zeros_like(tf, dtype=bool)
+        ix_freq[tf.index < freq_limit, :] = True
+    ix = np.bitwise_and(ix_coh, ix_freq)
 
     if method == 'diff':
+        if not np.any(np.array(np.shape(tf)) == 1):
+            raise ValueError('tf must be a 1D array for method: fit')
+
         # # Method 1: unwrap phase and take derivative
-        gd = -np.diff(np.unwrap(np.angle(tf)))/np.diff(tf.index)
+        tfv = tf.values.flatten()
+        gd = -np.diff(np.unwrap(np.angle(tfv))) / np.diff(tf.index)
         gd = np.append(gd, gd[-1])
         gd = gd/(2*np.pi)
-        avg_del = np.sum(gd * ix / np.sum(ix))
+        avg_del = np.sum(gd * ix.flatten() / np.sum(ix))
         return avg_del, ix
 
     # Method 2: curve fit the phase
     elif method == 'fit':
+        if not np.any(np.array(np.shape(tf)) == 1):
+            raise ValueError('tf must be a 1D array for method: fit')
+
         def delay_fitter(x, delval):
             """
             Curve fit helper function for computing the group delay.
@@ -420,9 +423,8 @@ def tf_delay(tf, coh, coh_limit=0.6, freq_limit=0.02, method='fit'):
             model = np.unwrap(np.angle(np.ones_like(x) *
                                        np.exp(2 * np.pi * 1j * x * -delval)))
             return model
-
         try:
-            return curve_fit(delay_fitter, tf.index[ix],
+            return curve_fit(delay_fitter, np.expand_dims(tf.index, axis=1)[ix],
                              np.unwrap(np.angle(tf.loc[ix]).flatten()))[0], ix
         except ValueError:
             from warnings import warn
@@ -433,7 +435,26 @@ def tf_delay(tf, coh, coh_limit=0.6, freq_limit=0.02, method='fit'):
             else:
                 warn('Curve fit failed for unknown reason. Returning NaN')
                 return np.nan, ix
+    elif method == "multi":
+        def residual(dels, freqs, phases, mask):
+            freqs = np.expand_dims(freqs, axis=1)
+            model = np.unwrap(np.angle(np.ones_like(freqs) *
+                                       np.exp(2 * np.pi * 1j * freqs * -dels)),
+                              axis=0)
+            actual = phases
 
+            diff = (actual - model) * mask
+            return np.sum(diff, axis=0)
+        ix_freq1 = ix_freq[:, 0]
+        guess = np.zeros((1, np.size(tf, axis=1)))
+        if isinstance(tf, (pd.DataFrame, pd.Series)):
+            tf_subset = tf.values[ix_freq1,:]
+        else:
+            tf_subset = tf[ix_freq1,:]
+        args = (tf.index[ix_freq1], np.unwrap(np.angle(tf_subset), axis=0), ix_coh[ix_freq1, :])
+        best, cov = leastsq(residual, guess, args=args)
+
+        return best, ix
     else:
         raise ValueError(f'Invalid method: {method}')
 

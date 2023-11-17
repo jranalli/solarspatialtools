@@ -179,10 +179,45 @@ def test_tf_delay(delay):
     tf, coh = averaged_tf(x_tsig, y_tsig, navgs, overlap, window, detrend)
 
     # Calculate the delay using the function
-    delay_result, _ = tf_delay(tf, coh, coh_limit=0.6, freq_limit=1, method='fit')
+    delay_result, _ = tf_delay(tf, coh, coh_limit=0.6, freq_limit=1, method='multi')
 
     # Check that the delay matches the expected delay
     assert np.isclose(delay_result, delay, atol=1e-2)
+
+
+@pytest.mark.parametrize("delay", [-5.0, -2.5, -0.5, 0.0, 0.5, 2.5, 5.0])
+def test_tf_delay_multi(delay):
+    np.random.seed(2023)
+    # Create a simple sinusoidal signal
+    fs = 500  # sample rate
+    T = 1000.0  # seconds
+    t = np.linspace(0, T, int(T * fs), endpoint=False)  # time variable
+
+    x = 0.5 * np.sin(2 * np.pi * 2 * t) + np.random.random(len(t))
+
+    y1 = np.roll(x, int(delay * fs))
+    y2 = np.roll(x, int(2 * delay * fs))
+    y3 = np.roll(x, int(3 * delay * fs))
+    y4 = np.roll(x, int(4 * delay * fs))
+    x_tsig = pd.Series(x, index=pd.TimedeltaIndex(t, 's'))
+    ysigs = [pd.Series(y, index=pd.TimedeltaIndex(t, 's')) for y in
+             [y1, y2, y3, y4]]
+    ysigs_df = pd.DataFrame(np.array(ysigs).T, columns=[0, 1, 2, 3],
+                            index=ysigs[0].index)
+
+    navgs = 5
+    overlap = 0.5
+    window = 'hamming'
+    detrend = None
+
+    tf, coh = averaged_tf(x_tsig, ysigs_df, navgs, overlap, window, detrend)
+
+    # Calculate the delay using the function
+    delay_result, _ = tf_delay(tf, coh, coh_limit=0.6, freq_limit=1, method='multi')
+
+    # Check that the delay matches the expected delay
+    delay_expect = np.array([delay, 2*delay, 3*delay, 4*delay])
+    assert np.allclose(delay_result, delay_expect, atol=1e-2)
 
 
 @pytest.mark.parametrize("delay", [-5.0, -2.5, -0.5, 0.0, 0.5, 2.5, 5.0])
