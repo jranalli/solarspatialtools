@@ -666,14 +666,13 @@ def apply_delay(tf, delay):
     the phase as a linear function of frequency.
 
     To compare with a unity transfer function, consider:
-        apply_delay(tf['tf'] * 0 + 1, delay)
+        apply_delay(tf * 0 + 1, delay)
 
     Parameters
     ----------
     tf : pd.DataFrame
-        The transfer function, produced by signalproc.averaged_tf. Critically,
-        it needs to have a column of 'tf' containing the complex valued
-        transfer function, and the index must contain the frequency in Hz.
+        The transfer function, produced by signalproc.averaged_tf. The index
+        must contain the frequency in Hz.
     delay : float
         The delay to apply to the transfer function. Units are in seconds.
 
@@ -683,10 +682,10 @@ def apply_delay(tf, delay):
     the phase.
     """
 
-    tf = tf.copy()
+    tfi = tf.copy().values.flatten()
 
     # Equation for rotating the phase by a delay
-    tf['tf'] = tf['tf'] * np.exp(2 * np.pi * 1j * tf.index * -delay)
+    tf = tfi * np.exp(2 * np.pi * 1j * tf.index * -delay)
 
     return tf
 
