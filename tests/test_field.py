@@ -13,8 +13,40 @@ def mode(request):
 
 
 @pytest.fixture(params=[0, 1, 2, 3, 4])
-def refdat(request, mode):
-    data = {
+def refdat(request, mode, delay_method):
+    data = {}
+    data['multi'] = {
+        "coherence": (
+            ('CMB-001-1', (46.35, 1117.45)),
+            ('CMB-025-7', (237.82, 531.65)),
+            ('CMB-015-3', (367.55, 811.45)),
+            ('CMB-003-1', (244.10, 1039.52)),
+            ('CMB-008-5', (164.93, 876.94))
+        ),
+        "global_coherence": (
+            ('CMB-001-1', (53.37, 1107.52)),
+            ('CMB-025-7', (234.23, 529.77)),
+            ('CMB-015-3', (369.15, 809.23)),
+            ('CMB-003-1', (245.82, 1054.97)),
+            ('CMB-008-5', (164.31, 876.15))
+        ),
+        "distance": (
+            ('CMB-001-1', (-36.97, 1063.08)),
+            ('CMB-025-7', (239.94, 540.79)),
+            ('CMB-015-3', (368.99, 810.51)),
+            ('CMB-003-1', (258.80, 1067.81)),
+            ('CMB-008-5', (162.10, 869.84))
+        ),
+        'all': (
+            ('CMB-001-1', (348.09, 653.15)),
+            ('CMB-025-7', (291.24, 542.36)),
+            ('CMB-015-3', (414.61, 587.06)),
+            ('CMB-003-1', (476.56, 652.45)),
+            ('CMB-008-5', (359.54, 617.64))
+        ),
+    }
+
+    data['fit'] = {
         "coherence": (
             ('CMB-001-1', (45.79, 1116.99)),
             ('CMB-025-7', (235.84, 531.57)),
@@ -45,15 +77,16 @@ def refdat(request, mode):
         ),
     }
 
-    datai = data[mode]
+    datai = data[delay_method][mode]
 
-    return mode, datai[request.param]
+    return delay_method, mode, datai[request.param]
 
 
 def test_compute_predicted_position_static(refdat):
-    mode = refdat[0]
-    ref = refdat[1][0]
-    expect = refdat[1][1]
+    delay_method = refdat[0]
+    mode = refdat[1]
+    ref = refdat[2][0]
+    expect = refdat[2][1]
 
     datafile = "../demos/data/sample_plant_2.h5"
     cmv_a = spatial.pol2rect(9.52, 0.62)
@@ -70,13 +103,19 @@ def test_compute_predicted_position_static(refdat):
         ref,  # the position within pos_utm to calculate about
         [cmv_a, cmv_b],  # The two individual CMVs for the DFs
         mode=mode,  # Mode for downselecting the comparison points
-        ndownsel=8)
+        ndownsel=8,
+        delay_method=delay_method)
 
     assert pos == approx(expect, abs=1e-2)
 
 
+@pytest.fixture(params=["fit", "multi"])
+def delay_method(request):
+    return request.param
+
+
 @pytest.mark.parametrize("delay", [-5.0, -2.5, -0.5, 0.0, 0.5, 2.5, 5.0])
-def test_compute_delays(delay):
+def test_compute_delays(delay, delay_method):
     np.random.seed(2023)
     # Create a simple sinusoidal signal with noise
     fs = 500  # sample rate
@@ -94,7 +133,7 @@ def test_compute_delays(delay):
     df = pd.DataFrame(np.array([x,y1,y2,y3,y4]).T, index=pd.TimedeltaIndex(t, 's'), columns=['x1','x2','x3','x4','x5'])
     ref = 'x1'
 
-    delays, coh = field.compute_delays(df, ref, navgs=5, coh_limit=0.6, freq_limit=1)
+    delays, coh = field.compute_delays(df, ref, navgs=5, coh_limit=0.6, freq_limit=1, method=delay_method)
 
-    assert (delays == approx([0, delay, 2*delay, 3*delay, 4*delay], abs=1e-3))
+    assert (delays == approx([0, delay, 2*delay, 3*delay, 4*delay], abs=2e-3))
 

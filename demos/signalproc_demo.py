@@ -79,10 +79,10 @@ def main():
     ts_wvm = kt_wvm * cs_ghi  # Convert from kt to ghi
 
     # Calculate Real Data TF
-    tf_data = signalproc.averaged_tf(ts_in, ts_agg, navgs=8, overlap=0.5,
-                                     detrend=None)
-    tf_wvm = signalproc.averaged_tf(ts_in, ts_wvm, navgs=8, overlap=0.5,
-                                    detrend=None)
+    tf_bas, coh_bas = signalproc.averaged_tf(ts_in, ts_agg, navgs=8,
+                                             overlap=0.5, detrend=None)
+    tf_wvm, coh_wvm = signalproc.averaged_tf(ts_in, ts_wvm, navgs=8,
+                                             overlap=0.5, detrend=None)
     # CAM and Marcos are already nice filter computations.
 
     # Plot TFs
@@ -150,9 +150,9 @@ def main():
     # Plot comparison of transfer functions (3 part plot)
     plt.figure(figsize=[4, 6])
     ax1 = plt.subplot(311)
-    plt.semilogx(tf_data.index, np.abs(tf_data['tf']),
+    plt.semilogx(tf_bas.index, np.abs(tf_bas),
                  camfilt.index, np.abs(camfilt),
-                 tf_wvm.index, np.abs(tf_wvm['tf']),
+                 tf_wvm.index, np.abs(tf_wvm),
                  marcosfilt.index, np.abs(marcosfilt))
     plt.legend(['Data', 'CAM', 'WVM', 'Marcos'])
     plt.setp(ax1.get_xticklabels(), visible=False)
@@ -160,17 +160,17 @@ def main():
     plt.ylabel('TF Mag')
 
     ax2 = plt.subplot(312, sharex=ax1)
-    plt.semilogx(tf_data.index, np.angle(tf_data['tf']),
+    plt.semilogx(tf_bas.index, np.angle(tf_bas),
                  camfilt.index, np.angle(camfilt),
-                 tf_wvm.index, np.angle(tf_wvm['tf']),
+                 tf_wvm.index, np.angle(tf_wvm),
                  marcosfilt.index, np.angle(marcosfilt))
     plt.setp(ax2.get_xticklabels(), visible=False)
     plt.ylabel('TF Phase (rad)')
 
     plt.subplot(313, sharex=ax1)
-    plt.semilogx(tf_data.index, tf_data['coh'],
+    plt.semilogx(tf_bas.index, coh_bas,
                  [0], [0],
-                 tf_wvm.index, tf_wvm['coh'])
+                 tf_wvm.index, coh_wvm)
     plt.xlabel('Frequency (Hz)')
     plt.ylabel('Coherence')
 

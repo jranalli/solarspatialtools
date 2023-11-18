@@ -93,7 +93,7 @@ def test_averaged_psd():
                                      detrend=detrend, scaling=scaling)
 
     # Check that the PSDs match
-    assert np.allclose(psd, psd_direct, atol=1e-5)
+    assert np.allclose(psd, pd.DataFrame(psd_direct), atol=1e-5)
 
 
 def test_averaged_tf():
@@ -111,7 +111,7 @@ def test_averaged_tf():
     overlap = 0.5
     window = 'hamming'
     detrend = 'linear'
-    tf = averaged_tf(x_tsig, y_tsig, navgs, overlap, window, detrend)
+    tf, coh = averaged_tf(x_tsig, y_tsig, navgs, overlap, window, detrend)
 
     # Calculate the transfer function directly using scipy csd and welch
     freqs, Pxy = signal.csd(x, y, fs, window, nperseg=len(x)//navgs,
@@ -120,10 +120,20 @@ def test_averaged_tf():
     freqs, Pxx = signal.welch(x, fs, window, nperseg=len(x)//navgs,
                               noverlap=int(overlap*len(x)//navgs),
                               detrend=detrend)
+    freqs, Pyy = signal.welch(y, fs, window, nperseg=len(x) // navgs,
+                              noverlap=int(overlap * len(x) // navgs),
+                              detrend=detrend)
+
     tf_direct = Pxy / Pxx
+    coh_direct = np.abs(Pxy)**2 / (Pxx * Pyy)
+    # freqs, coh_direct = signal.coherence(x, y, fs, window, nperseg=len(x)//navgs,
+    #                               noverlap=int(overlap*len(x)//navgs),
+    #                               detrend=detrend)
 
     # Check that the transfer functions match
-    assert np.allclose(tf['tf'], tf_direct, atol=1e-5)
+    assert np.allclose(tf, pd.DataFrame(tf_direct), atol=1e-5)
+    assert np.allclose(coh, pd.DataFrame(coh_direct), atol=1e-5)
+    assert np.allclose(tf.index, freqs, atol=1e-5)
 
 
 def test_interp_tf():
@@ -166,13 +176,48 @@ def test_tf_delay(delay):
     overlap = 0.5
     window = 'hamming'
     detrend = 'linear'
-    tf = averaged_tf(x_tsig, y_tsig, navgs, overlap, window, detrend)
+    tf, coh = averaged_tf(x_tsig, y_tsig, navgs, overlap, window, detrend)
 
     # Calculate the delay using the function
-    delay_result, _ = tf_delay(tf, coh_limit=0.6, freq_limit=1, method='fit')
+    delay_result, _ = tf_delay(tf, coh, coh_limit=0.6, freq_limit=1, method='multi')
 
     # Check that the delay matches the expected delay
     assert np.isclose(delay_result, delay, atol=1e-2)
+
+
+@pytest.mark.parametrize("delay", [-5.0, -2.5, -0.5, 0.0, 0.5, 2.5, 5.0])
+def test_tf_delay_multi(delay):
+    np.random.seed(2023)
+    # Create a simple sinusoidal signal
+    fs = 500  # sample rate
+    T = 1000.0  # seconds
+    t = np.linspace(0, T, int(T * fs), endpoint=False)  # time variable
+
+    x = 0.5 * np.sin(2 * np.pi * 2 * t) + np.random.random(len(t))
+
+    y1 = np.roll(x, int(delay * fs))
+    y2 = np.roll(x, int(2 * delay * fs))
+    y3 = np.roll(x, int(3 * delay * fs))
+    y4 = np.roll(x, int(4 * delay * fs))
+    x_tsig = pd.Series(x, index=pd.TimedeltaIndex(t, 's'))
+    ysigs = [pd.Series(y, index=pd.TimedeltaIndex(t, 's')) for y in
+             [y1, y2, y3, y4]]
+    ysigs_df = pd.DataFrame(np.array(ysigs).T, columns=[0, 1, 2, 3],
+                            index=ysigs[0].index)
+
+    navgs = 5
+    overlap = 0.5
+    window = 'hamming'
+    detrend = None
+
+    tf, coh = averaged_tf(x_tsig, ysigs_df, navgs, overlap, window, detrend)
+
+    # Calculate the delay using the function
+    delay_result, _ = tf_delay(tf, coh, coh_limit=0.6, freq_limit=1, method='multi')
+
+    # Check that the delay matches the expected delay
+    delay_expect = np.array([delay, 2*delay, 3*delay, 4*delay])
+    assert np.allclose(delay_result, delay_expect, atol=1e-2)
 
 
 @pytest.mark.parametrize("delay", [-5.0, -2.5, -0.5, 0.0, 0.5, 2.5, 5.0])
@@ -202,17 +247,17 @@ def test_apply_delay(delay):
     phase = -2 * np.pi * freqs * delay  # phase delay
     mag = np.ones_like(freqs)  # magnitude
     coh = np.ones_like(freqs)  # coherence
-    tf = pd.DataFrame({'tf': mag * np.exp(1j * phase), 'coh': coh}, index=freqs)
+    tf = pd.DataFrame({'tf': mag * np.exp(1j * phase)}, index=freqs)
 
     # Apply the delay using the function
     tf_delayed = apply_delay(tf, delay)
 
     # Calculate the expected delayed transfer function
-    tf_expected = tf.copy()
-    tf_expected['tf'] = tf['tf'] * np.exp(2 * np.pi * 1j * tf.index * -delay)
+    tf_expected = tf.copy().values.flatten()
+    tf_expected = tf_expected * np.exp(2 * np.pi * 1j * tf.index * -delay)
 
     # Check that the delayed transfer function matches the expected one
-    assert np.allclose(tf_delayed['tf'], tf_expected['tf'], atol=1e-5)
+    assert np.allclose(tf_delayed, tf_expected, atol=1e-5)
 
 
 def test_averaged_psd_multi():
@@ -229,12 +274,13 @@ def test_averaged_psd_multi():
 
     xs = [x1, x2, x3, x4]
     tsigs = [pd.Series(x, index=pd.TimedeltaIndex(t, 's')) for x in xs]
+    tsigs_df = pd.DataFrame(np.array(tsigs).T, columns=[0, 1, 2, 3], index=tsigs[0].index)
     navgs = 5
     overlap = 0.5
     window = 'hamming'
     detrend = 'linear'
     scaling = 'density'
-    psds = [averaged_psd(tsig, navgs, overlap, window, detrend, scaling) for tsig in tsigs]
+    psds = averaged_psd(tsigs_df, navgs, overlap, window, detrend, scaling)
 
     # Calculate the PSD directly using scipy.signal.welch
     freqs, psd_direct = signal.welch(xs, fs, window, nperseg=len(x1)//navgs,
@@ -242,10 +288,10 @@ def test_averaged_psd_multi():
                                      detrend=detrend, scaling=scaling)
 
     # Check that the PSDs match
-    assert np.allclose(psds, psd_direct, atol=1e-5)
+    assert np.allclose(psds, pd.DataFrame(psd_direct.T), atol=1e-5)
 
 
-def test_averaged_tf_multi():
+def test_averaged_tf_multiout():
     np.random.seed(2023)
     # Create a simple sinusoidal signal
     fs = 500  # sample rate
@@ -259,49 +305,102 @@ def test_averaged_tf_multi():
     y2 = np.roll(x, int(2*delay * fs))
     y3 = np.roll(x, int(3*delay * fs))
     y4 = np.roll(x, int(4*delay * fs))
-
-    ys = [y1, y2, y3, y4]
-
     x_tsig = pd.Series(x, index=pd.TimedeltaIndex(t, 's'))
-    ysigs = [pd.Series(y, index=pd.TimedeltaIndex(t, 's')) for y in ys]
+    ysigs = [pd.Series(y, index=pd.TimedeltaIndex(t, 's')) for y in [y1, y2, y3, y4]]
+    ysigs_df = pd.DataFrame(np.array(ysigs).T, columns=[0, 1, 2, 3], index=ysigs[0].index)
+
     navgs = 5
     overlap = 0.5
     window = 'hamming'
-    detrend = 'linear'
-    tfs = [averaged_tf(x_tsig, ysig, navgs, overlap, window, detrend)['tf'] for ysig in ysigs]
+    detrend = None
 
-    ##########################
-    # Seems like this works as long as you do a list of signals for the y, rather than a dataframe of signals.
-    # If you have a dataframe of signals, you can convert by dff.values.T.tolist()
-    ##########################
-    freqs, somePxy = signal.csd([x_tsig, ysigs[0], ysigs[1], ysigs[2]], ysigs, fs, window,
-               nperseg=len(x) // navgs,
-               noverlap=int(overlap * len(x) // navgs),
-               detrend=detrend)
-    freqs, somePxx = signal.welch([x_tsig, ysigs[0], ysigs[1], ysigs[2]], fs, window, nperseg=len(x)//navgs,
-                              noverlap=int(overlap*len(x)//navgs),
-                              detrend=detrend)
-    sometf_direct = somePxy / somePxx
-    # import matplotlib.pyplot as plt
-    # plt.plot(freqs, np.abs(sometf_direct).T)
-    # plt.figure()
-    # plt.plot(freqs, np.angle(sometf_direct).T)
-    # plt.show()
+    tf, coh = averaged_tf(x_tsig, ysigs_df, navgs, overlap, window, detrend)
 
-
-    # Calculate the PSD directly using scipy.signal.welch
-    # Calculate the transfer function directly using scipy csd and welch
-    freqs, Pxy = signal.csd(x_tsig, ysigs, fs, window, nperseg=len(x)//navgs,
-                            noverlap=int(overlap*len(x)//navgs),
-                            detrend=detrend)
-    freqs, Pxx = signal.welch(x_tsig, fs, window, nperseg=len(x)//navgs,
-                              noverlap=int(overlap*len(x)//navgs),
-                              detrend=detrend)
-    tf_direct = Pxy / Pxx
+    loop_dat = [averaged_tf(x_tsig, ysig, navgs, overlap, window, detrend) for ysig in ysigs]
+    tf_loop = [dat[0] for dat in loop_dat]
+    coh_loop = [dat[1] for dat in loop_dat]
+    tf_loop = np.array(tf_loop)[:, :, 0].T
+    coh_loop = np.array(coh_loop)[:, :, 0].T
 
     # Check that the PSDs match
-    assert np.allclose(tfs, tf_direct, atol=1e-5)
+    assert np.allclose(tf, tf_loop, atol=1e-5)
+    assert np.allclose(coh, coh_loop, atol=1e-5)
 
+
+def test_averaged_tf_multiin():
+    np.random.seed(2023)
+    # Create a simple sinusoidal signal
+    fs = 500  # sample rate
+    T = 1000.0    # seconds
+    t = np.linspace(0, T, int(T*fs), endpoint=False)  # time variable
+    delay = 3
+
+    x = 0.5 * np.sin(2 * np.pi * 2 * t) + np.random.random(len(t))
+
+    y1 = np.roll(x, int(delay*fs))
+    y2 = np.roll(x, int(2*delay * fs))
+    y3 = np.roll(x, int(3*delay * fs))
+    y4 = np.roll(x, int(4*delay * fs))
+    x_tsig = pd.Series(x, index=pd.TimedeltaIndex(t, 's'))
+    ysigs = [pd.Series(y, index=pd.TimedeltaIndex(t, 's')) for y in [y1, y2, y3, y4]]
+    ysigs_df = pd.DataFrame(np.array(ysigs[0]).T, columns=[0], index=ysigs[0].index)
+
+    xsigs = [x_tsig, ysigs[0], ysigs[1], ysigs[2]]
+    xsigs_df = pd.DataFrame(np.array(xsigs).T, columns=[0, 1, 2, 3], index=ysigs[0].index)
+    navgs = 5
+    overlap = 0.5
+    window = 'hamming'
+    detrend = None
+
+    tf, coh = averaged_tf(xsigs_df, ysigs_df, navgs, overlap, window, detrend)
+
+    loop_dat = [averaged_tf(xsig, ysigs[0], navgs, overlap, window, detrend) for xsig in xsigs]
+    tf_loop = [dat[0] for dat in loop_dat]
+    coh_loop = [dat[1] for dat in loop_dat]
+    tf_loop = np.array(tf_loop)[:, :, 0].T
+    coh_loop = np.array(coh_loop)[:, :, 0].T
+
+    # Check that the PSDs match
+    assert np.allclose(tf, tf_loop, atol=1e-5)
+    assert np.allclose(coh, coh_loop, atol=1e-5)
+
+
+def test_averaged_tf_multiboth():
+    np.random.seed(2023)
+    # Create a simple sinusoidal signal
+    fs = 500  # sample rate
+    T = 1000.0    # seconds
+    t = np.linspace(0, T, int(T*fs), endpoint=False)  # time variable
+    delay = 3
+
+    x = 0.5 * np.sin(2 * np.pi * 2 * t) + np.random.random(len(t))
+
+    y1 = np.roll(x, int(delay*fs))
+    y2 = np.roll(x, int(2*delay * fs))
+    y3 = np.roll(x, int(3*delay * fs))
+    y4 = np.roll(x, int(4*delay * fs))
+    x_tsig = pd.Series(x, index=pd.TimedeltaIndex(t, 's'))
+    ysigs = [pd.Series(y, index=pd.TimedeltaIndex(t, 's')) for y in [y1, y2, y3, y4]]
+    ysigs_df = pd.DataFrame(np.array(ysigs).T, columns=[0, 1, 2, 3], index=ysigs[0].index)
+
+    xsigs = [x_tsig, ysigs[0], ysigs[1], ysigs[2]]
+    xsigs_df = pd.DataFrame(np.array(xsigs).T, columns=[0, 1, 2, 3], index=ysigs[0].index)
+    navgs = 5
+    overlap = 0.5
+    window = 'hamming'
+    detrend = None
+
+    tf, coh = averaged_tf(xsigs_df, ysigs_df, navgs, overlap, window, detrend)
+
+    loop_dat = [averaged_tf(xsig, ysig, navgs, overlap, window, detrend) for xsig, ysig in zip(xsigs, ysigs)]
+    tf_loop = [dat[0] for dat in loop_dat]
+    coh_loop = [dat[1] for dat in loop_dat]
+    tf_loop = np.array(tf_loop)[:, :, 0].T
+    coh_loop = np.array(coh_loop)[:, :, 0].T
+
+    # Check that the PSDs match
+    assert np.allclose(tf, tf_loop, atol=1e-5)
+    assert np.allclose(coh, coh_loop, atol=1e-5)
 
 @pytest.fixture(params=['loop', 'fft'])
 def compute_delays_modes(request):

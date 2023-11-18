@@ -11,7 +11,8 @@ warnings.filterwarnings("ignore",
 
 def compute_predicted_position(dfs, pos_utm, ref, cld_vecs=None,
                                mode='coherence', ndownsel=8,
-                               navgs=5, coh_limit=0.6, freq_limit=0.02):
+                               navgs=5, coh_limit=0.6, freq_limit=0.02,
+                               delay_method="multi"):
     """
     Compute the predicted position of a combiner based upon the cloud movement.
     Requires two separate inputs with different CMV directions. Inputs are
@@ -48,6 +49,8 @@ def compute_predicted_position(dfs, pos_utm, ref, cld_vecs=None,
     freq_limit : float
         The maximum frequency that will be used when computing the delay.
         See solartoolbox.signalproc.tf_delay for more info.
+    delay_method : str
+        The method for computing the delay. Options are 'fit' and 'multi'.
 
     Returns
     -------
@@ -84,7 +87,8 @@ def compute_predicted_position(dfs, pos_utm, ref, cld_vecs=None,
         # Get the pairwise delays
         delay, coh = compute_delays(df, ref, navgs=navgs,
                                     coh_limit=coh_limit,
-                                    freq_limit=freq_limit)
+                                    freq_limit=freq_limit,
+                                    method=delay_method)
 
         # Convert them to distances along the cloud motion vector
         delay_dist = -delay * spatial.magnitude(cld_vec)
@@ -154,7 +158,8 @@ def compute_predicted_position(dfs, pos_utm, ref, cld_vecs=None,
     return pos, combined_data
 
 
-def compute_delays(df, ref, navgs=5, coh_limit=0.6, freq_limit=0.02):
+def compute_delays(df, ref, navgs=5, coh_limit=0.6, freq_limit=0.02,
+                   method="multi"):
     """
     Computes delay between groups of signals. Will find the delay between the
     reference and every using a transfer function between the reference and
@@ -176,6 +181,8 @@ def compute_delays(df, ref, navgs=5, coh_limit=0.6, freq_limit=0.02):
     freq_limit : float
         The maximum frequency that will be used when computing the delay.
         Default is 0.02. See solartoolbox.signalproc.tf_delay for more info.
+    method : str
+        The method for computing the delay. Options are 'fit' and 'multi'.
 
     Returns
     -------
@@ -185,26 +192,34 @@ def compute_delays(df, ref, navgs=5, coh_limit=0.6, freq_limit=0.02):
         The average coherence for each transfer function within the window.
     """
 
-    # Compute delay for every point pair for this reference
-    delay = np.zeros_like(df.columns, dtype=float)
-    coh = np.zeros_like(df.columns, dtype=float)
-    ts_in = df[ref]
-    for i, point in enumerate(df.columns):
-        ts_out = df[point]
+    # Compute all TFs
+    tf, tfcoh = signalproc.averaged_tf(df[ref], df, navgs=navgs, overlap=0.5,
+                                       window='hamming', detrend=None)
 
-        # Compute TF
-        tf = signalproc.averaged_tf(ts_in, ts_out, navgs=navgs, overlap=0.5,
-                                    window='hamming', detrend=None)
-        # Find the time delay from the TF phase
-        delay[i], ix = signalproc.tf_delay(tf,
-                                           coh_limit=coh_limit,
-                                           freq_limit=freq_limit)
+    if method == "fit":  # A looping method
+        delay = np.zeros_like(df.columns, dtype=float)
+        coh = np.zeros_like(df.columns, dtype=float)
+        for i, col in enumerate(tf.columns):
+            tf_i = tf[col]
+            coh_i = tfcoh[col]
 
-        # How good was the coherence? Average across TF
-        tfsub = tf['coh'][tf.index < freq_limit]
-        coh[i] = np.sum(tfsub) / len(tfsub)
-        # coh[i] = np.sum(tf['coh']) / len(tf['coh'])  # Alt average of all TF
+            # Find the time delay from the TF phase
+            delay[i], ix = signalproc.tf_delay(tf_i, coh_i,
+                                               coh_limit=coh_limit,
+                                               freq_limit=freq_limit,
+                                               method='fit')
 
+            # How good was the coherence? Average across TF
+            tfsub = coh_i[tf.index < freq_limit]
+            coh[i] = np.sum(tfsub.values) / len(tfsub)
+
+    elif method == "multi":  # The most efficient method
+        delay, ix = signalproc.tf_delay(tf, tfcoh, coh_limit=coh_limit,
+                                        freq_limit=freq_limit, method='multi')
+        freq_ix = tf.index < freq_limit
+        coh = np.sum(tfcoh.values[freq_ix, :], axis=0)/np.sum(freq_ix, axis=0)
+    else:
+        raise ValueError(f"Invalid method: {method}")
     return delay, coh
 
 

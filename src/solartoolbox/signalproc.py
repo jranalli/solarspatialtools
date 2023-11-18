@@ -3,7 +3,7 @@ import pandas as pd
 import scipy.signal
 from scipy import signal
 from scipy.interpolate import interp1d
-from scipy.optimize import curve_fit
+from scipy.optimize import curve_fit, leastsq
 
 from solartoolbox import spatial
 
@@ -192,13 +192,21 @@ def averaged_psd(input_tsig, navgs, overlap=0.5,
     dt = (input_tsig.index[1] - input_tsig.index[0]).total_seconds()
     fs = 1/dt
 
-    nperseg = int(len(input_tsig) // navgs)
+    if isinstance(input_tsig, pd.Series):
+        return averaged_psd(pd.DataFrame(input_tsig), navgs, overlap, window,
+                            detrend)
+
+    cols = input_tsig.columns
+    input_tsig = input_tsig.values.T
+
+    nperseg = int(input_tsig.shape[1] // navgs)
     noverlap = int(nperseg * overlap)
+
     f, psdxx = signal.welch(input_tsig, fs=fs, window=window,
                             nperseg=nperseg, detrend=detrend,
                             noverlap=noverlap, scaling=scaling)
     # Reported units from scipy are V**2/Hz
-    return pd.Series(psdxx, index=f)
+    return pd.DataFrame(psdxx.T, index=f, columns=cols)
 
 
 def averaged_tf(input_tsig, output_tsig,
@@ -238,29 +246,64 @@ def averaged_tf(input_tsig, output_tsig,
             'tf' - the complex transfer function
             'coh' - the coherence
     """
-
     dt = (input_tsig.index[1] - input_tsig.index[0]).total_seconds()
     fs = 1/dt
 
-    nperseg = int(len(input_tsig) // navgs)
+    if isinstance(output_tsig, pd.Series):
+        return averaged_tf(input_tsig, pd.DataFrame(output_tsig),
+                           navgs, overlap, window, detrend)
+    if isinstance(input_tsig, pd.Series):
+        return averaged_tf(pd.DataFrame(input_tsig), output_tsig, navgs,
+                           overlap, window, detrend)
+
+    if not (isinstance(output_tsig, pd.DataFrame)
+            and isinstance(input_tsig, pd.DataFrame)):
+        raise ValueError('Input and output timesignals must be pandas types')
+
+    out_cols = output_tsig.columns
+    in_cols = input_tsig.columns
+    output_tsig = output_tsig.values.T
+    input_tsig = input_tsig.values.T
+
+    if len(out_cols) == len(in_cols):
+        cols = [f"{in_cols[i]}_{out_cols[i]}" for i in range(len(out_cols))]
+    elif len(out_cols) == 1:
+        cols = [f"{in_cols[i]}_{out_cols[0]}" for i in range(len(in_cols))]
+    elif len(in_cols) == 1:
+        cols = [f"{in_cols[0]}_{out_cols[i]}" for i in range(len(out_cols))]
+    else:
+        raise RuntimeError("Shouldn't Be Possible")
+
+    nperseg = int(input_tsig.shape[1] // navgs)
     noverlap = int(nperseg * overlap)
 
     # Calculate the transfer function
-    psdxx = averaged_psd(input_tsig, window=window, navgs=navgs,
-                         detrend=detrend, overlap=overlap, scaling='density')
-    _, csdxy = signal.csd(input_tsig, output_tsig, fs=fs, window=window,
-                          nperseg=nperseg, detrend=detrend,
-                          noverlap=noverlap)
+    _, psdxx = signal.welch(input_tsig, fs=fs, window=window,
+                            nperseg=nperseg, detrend=detrend,
+                            noverlap=noverlap, scaling='density')
+    _, psdyy = signal.welch(output_tsig, fs=fs, window=window,
+                            nperseg=nperseg, detrend=detrend,
+                            noverlap=noverlap, scaling='density')
+    freqs, csdxy = signal.csd(input_tsig, output_tsig, fs=fs, window=window,
+                              nperseg=nperseg, detrend=detrend,
+                              noverlap=noverlap)
+
+    # try:
     tf = csdxy / psdxx
+    coh = np.abs(csdxy) ** 2 / (psdxx * psdyy)
+    # except ValueError:
+    #     tf = csdxy.T / np.expand_dims(psdxx, axis=1)
+    #     coh = np.abs(csdxy) ** 2 / (np.expand_dims(psdxx, axis=1) * psdyy)
 
     # Calculate the coherence
-    _, coh = signal.coherence(input_tsig, output_tsig, fs=fs, window=window,
-                              nperseg=nperseg, noverlap=noverlap,
-                              detrend=detrend)
+    # _, coh = signal.coherence(input_tsig, output_tsig, fs=fs, window=window,
+    #                           nperseg=nperseg, noverlap=noverlap,
+    #                           detrend=detrend)
 
-    output = pd.DataFrame({'tf': tf, 'coh': coh}, index=psdxx.index)
+    tf = pd.DataFrame(tf.T, index=freqs, columns=cols)
+    coh = pd.DataFrame(coh.T, index=freqs, columns=cols)
 
-    return output
+    return tf, coh
 
 
 def interp_tf(new_freq, input_tf):
@@ -316,15 +359,17 @@ def interp_tf(new_freq, input_tf):
     return interp_filt
 
 
-def tf_delay(tf, coh_limit=0.6, freq_limit=0.02, method='fit'):
+def tf_delay(tf, coh, coh_limit=0.6, freq_limit=0.02, method='fit'):
     """
     Compute the delay based on the phase of a transfer function
 
     Parameters
     ----------
     tf : pd.DataFrame
-        The transfer function, produced by signalproc.averaged_tf. Critically,
-        it needs to have columns of 'tf' and 'coh' in order to use the limit.
+        The transfer functions, produced by signalproc.averaged_tf.
+    coh : pd.DataFrame
+        The coherence, produced by signalproc.averaged_tf. Must match shape
+        of tf.
     coh_limit : float
         The coherence limit to use for filtering the phase. Set to None to
         include all points.
@@ -342,45 +387,85 @@ def tf_delay(tf, coh_limit=0.6, freq_limit=0.02, method='fit'):
         The delay in seconds
 
     """
-    try:
-        if coh_limit is None:
-            ix1 = np.ones_like(tf.index, dtype=bool)
-        else:
-            ix1 = tf['coh'] > coh_limit
-        if freq_limit is None:
-            ix2 = np.ones_like(tf.index, dtype=bool)
-        else:
-            ix2 = tf.index < freq_limit
-        ix = np.bitwise_and(ix1, ix2)
-    except KeyError:
-        from warnings import warn
-        warn('No coherence column found, using all points.')
-        ix = np.ones_like(tf.index, dtype=bool)
+
+    def _delay_fitter(x, delval):
+        """
+        Helper function for use with curve_fit. Computes the modeled phase.
+        :param x: the transfer function frequency
+        :param delval: The 'real' phase to fit the group delay to
+        :return: the modeled phase
+        """
+        # model = np.unwrap(np.angle(np.ones_like(x) *
+        #                            np.exp(2 * np.pi * 1j * x * -delval)))
+        # Simplifies to a linear relationship
+        model = 2 * np.pi * x * -delval
+        return model
+
+    def _residual(dels, freqs, phases, mask):
+        """
+        Helper function for use with leastsq. Computes the residual between
+        the modeled phase and the measured phase.
+        Parameters
+        ----------
+        dels : float
+            The array of delay to use for the model
+        freqs : float
+            The frequency array (must be multidimensional)
+        phases : float
+            The measured phase array (must be multidimensional)
+        mask : bool
+            The mask to use for filtering the phase
+
+        Returns
+        -------
+        residual : float
+            The residual between the model and the measured phase
+        """
+        # model = np.unwrap(np.angle(np.ones_like(freqs) *
+        #                            np.exp(2 * np.pi * 1j * freqs * -dels)),
+        #                   axis=0)
+        # Simplifies to a linear relationship
+        model = 2*np.pi*freqs*-dels
+        diff = (phases - model) * mask
+        return np.sum(diff, axis=0)
+
+    if isinstance(tf, pd.Series):
+        return tf_delay(pd.DataFrame(tf), coh, coh_limit, freq_limit, method)
+    if isinstance(coh, pd.Series):
+        return tf_delay(tf, pd.DataFrame(coh), coh_limit, freq_limit, method)
+
+    if coh_limit is None:
+        ix_coh = np.ones_like(coh, dtype=bool)
+    else:
+        ix_coh = (coh.values > coh_limit)
+    if freq_limit is None:
+        ix_freq = np.ones_like(tf, dtype=bool)
+    else:
+        ix_freq = np.zeros_like(tf, dtype=bool)
+        ix_freq[tf.index < freq_limit, :] = True
+    ix = np.bitwise_and(ix_coh, ix_freq)
 
     if method == 'diff':
+        if not np.any(np.array(np.shape(tf)) == 1):
+            raise ValueError('tf must be a 1D array for method: fit')
+
         # # Method 1: unwrap phase and take derivative
-        gd = -np.diff(np.unwrap(np.angle(tf)))/np.diff(tf.index)
+        tfv = tf.values.flatten()
+        gd = -np.diff(np.unwrap(np.angle(tfv))) / np.diff(tf.index)
         gd = np.append(gd, gd[-1])
         gd = gd/(2*np.pi)
-        avg_del = np.sum(gd * ix / np.sum(ix))
+        avg_del = np.sum(gd * ix.flatten() / np.sum(ix))
         return avg_del, ix
 
     # Method 2: curve fit the phase
     elif method == 'fit':
-        def delay_fitter(x, delval):
-            """
-            Curve fit helper function for computing the group delay.
-            :param x: the transfer function frequency
-            :param delval: The 'real' phase to fit the group delay to
-            :return: the modeled phase
-            """
-            model = np.unwrap(np.angle(np.ones_like(x) *
-                                       np.exp(2 * np.pi * 1j * x * -delval)))
-            return model
-
+        if not np.any(np.array(np.shape(tf)) == 1):
+            raise ValueError('tf must be a 1D array for method: fit')
         try:
-            return curve_fit(delay_fitter, tf.index[ix],
-                             np.unwrap(np.angle(tf['tf'][ix])))[0], ix
+            return (curve_fit(_delay_fitter,
+                              np.expand_dims(tf.index, axis=1)[ix],
+                              np.unwrap(np.angle(tf.loc[ix]).flatten()))[0],
+                    ix)
         except ValueError:
             from warnings import warn
             if not ix.any():
@@ -390,7 +475,25 @@ def tf_delay(tf, coh_limit=0.6, freq_limit=0.02, method='fit'):
             else:
                 warn('Curve fit failed for unknown reason. Returning NaN')
                 return np.nan, ix
+    elif method == "multi":
 
+        # The guess for the delays
+        guess = np.zeros((1, np.size(tf, axis=1)))
+
+        # Get subsets on the frequency axis to simplify fitting
+        ix_freq1 = ix_freq[:, 0]
+        if isinstance(tf, (pd.DataFrame, pd.Series)):
+            tf_subset = tf.values[ix_freq1, :]
+        else:
+            tf_subset = tf[ix_freq1, :]
+
+        # The arguments for the residual function
+        args = (np.expand_dims(tf.index[ix_freq1], axis=1),
+                np.unwrap(np.angle(tf_subset), axis=0),
+                ix_coh[ix_freq1, :])
+        # Perform the simultaneous least squares fit
+        best, cov = leastsq(_residual, guess, args=args)
+        return best, ix
     else:
         raise ValueError(f'Invalid method: {method}')
 
@@ -544,7 +647,8 @@ def compute_delays(ts_in, ts_out, mode='loop', scaling='coeff'):
         peak_lag_indices = corrxy.argmax(axis=1)
         delay = -lags[peak_lag_indices]
 
-        extras['peak_corr'] = corrxy[range(ts_inm.shape[0]), peak_lag_indices] * corr_scale
+        extras['peak_corr'] = (corrxy[range(ts_inm.shape[0]), peak_lag_indices]
+                               * corr_scale)
         extras['mean_corr'] = np.mean(corrxy, axis=1) * corr_scale
         extras['zero_corr'] = corrxy[:, zero_lag_ind] * corr_scale
     else:
@@ -562,14 +666,13 @@ def apply_delay(tf, delay):
     the phase as a linear function of frequency.
 
     To compare with a unity transfer function, consider:
-        apply_delay(tf['tf'] * 0 + 1, delay)
+        apply_delay(tf * 0 + 1, delay)
 
     Parameters
     ----------
     tf : pd.DataFrame
-        The transfer function, produced by signalproc.averaged_tf. Critically,
-        it needs to have a column of 'tf' containing the complex valued
-        transfer function, and the index must contain the frequency in Hz.
+        The transfer function, produced by signalproc.averaged_tf. The index
+        must contain the frequency in Hz.
     delay : float
         The delay to apply to the transfer function. Units are in seconds.
 
@@ -579,10 +682,10 @@ def apply_delay(tf, delay):
     the phase.
     """
 
-    tf = tf.copy()
+    tfi = tf.copy().values.flatten()
 
     # Equation for rotating the phase by a delay
-    tf['tf'] = tf['tf'] * np.exp(2 * np.pi * 1j * tf.index * -delay)
+    tf = tfi * np.exp(2 * np.pi * 1j * tf.index * -delay)
 
     return tf
 
@@ -751,7 +854,8 @@ def apply_filter(input_tsig, comp_filt):
     return filtered_sig
 
 
-def get_camfilter(positions, cloud_speed, cloud_dir, ref_position, dx=1, **kwargs):
+def get_camfilter(positions, cloud_speed, cloud_dir, ref_position, dx=1,
+                  **kwargs):
     """
     Compute the filter for the CAM model
 
