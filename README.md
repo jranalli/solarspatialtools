@@ -122,6 +122,8 @@ Add field analysis.
 A non-backwards-compatible major revision to incorporate field analysis and add more comprehensive testing.
 ##### Version 0.3.2
 A non-backwards-compatible major revision to create a major speedup on the CMV.
+##### Version 0.3.3
+Breaks backwards compatibility. Major speed improvements to field, via computation of the transfer function delays.
 
 ## Author
 Joe Ranalli  
