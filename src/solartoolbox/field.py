@@ -115,8 +115,10 @@ def compute_predicted_position(dfs, pos_utm, ref, cld_vecs=None,
     if mode == 'coherence' or mode == 'preavg':  # preavg is for back compat.
         # Downselect by best coherence in each axis
         coh1 = combined_data[0]['coh']
+        coh1 = coh1[np.isfinite(coh1)]
         ix1 = coh1.sort_values().iloc[-ndownsel:-1].index
         coh2 = combined_data[1]['coh']
+        coh2 = coh2[np.isfinite(coh2)]
         ix2 = coh2.sort_values().iloc[-ndownsel:-1].index
     elif mode == 'global_coherence':
         # Downselect to the points with the strongest overall coherence
@@ -211,77 +213,14 @@ def compute_delays(df, ref, navgs=5, coh_limit=0.6, freq_limit=0.02,
 
             # How good was the coherence? Average across TF
             tfsub = coh_i[tf.index < freq_limit]
-            coh[i] = np.sum(tfsub.values) / len(tfsub)
+            coh[i] = np.nansum(tfsub.values) / len(tfsub)
 
     elif method == "multi":  # The most efficient method
         delay, ix = signalproc.tf_delay(tf, tfcoh, coh_limit=coh_limit,
                                         freq_limit=freq_limit, method='multi')
         freq_ix = tf.index < freq_limit
-        coh = np.sum(tfcoh.values[freq_ix, :], axis=0)/np.sum(freq_ix, axis=0)
+        coh = np.nansum(tfcoh.values[freq_ix, :], axis=0) / np.nansum(freq_ix,
+                                                                      axis=0)
     else:
         raise ValueError(f"Invalid method: {method}")
     return delay, coh
-
-
-def compute_cloud_dist(df, ref, cld_vec, navgs=5,
-                       coh_limit=0.6, freq_limit=0.02):
-    """
-    Computes the implied distance between a point and a reference based upon
-    the cloud motion. Will find the delay between the reference and every
-    possible point using a transfer function between the reference and those
-    possible points. Will compute the rate * time = distance implied by that
-    delay, along the cloud motion direction.
-
-    Parameters
-    ----------
-    df : pandas.DataFrame
-        Time series of the data. Columns are the points, rows are the time.
-    ref : str
-        The name of the reference point. Must be a column in df.
-    cld_vec : np.ndarray
-        The cloud motion vector, [Vx, Vy]
-    navgs : int
-        The number of averages to use when computing the transfer function.
-        Affects both the coherence and the frequency resolution. Default is 5.
-        see solartoolbox.signalproc.averaged_tf for more information.
-    coh_limit : float
-        The minimum coherence required for computing the delay. Default is 0.6.
-        See solartoolbox.signalproc.tf_delay for more information.
-    freq_limit : float
-        The maximum frequency that will be used when computing the delay.
-        Default is 0.02. See solartoolbox.signalproc.tf_delay for more info.
-
-    Returns
-    -------
-    cloud_dist : np.ndarray
-        The distances implied by the cloud motion along the cloud motion dir.
-    delay : np.ndarray
-        The raw delay for the point pair computed from the TF phase
-    coh : np.ndarray
-        The average coherence for each transfer function.
-    """
-
-    # Compute delay for every point pair for this reference
-    delay = np.zeros_like(df.columns, dtype=float)
-    cloud_dist = np.zeros_like(df.columns, dtype=float)
-    coh = np.zeros_like(df.columns, dtype=float)
-    ts_in = df[ref]
-    for i, point in enumerate(df.columns):
-        ts_out = df[point]
-
-        # Compute TF
-        tf = signalproc.averaged_tf(ts_in, ts_out, navgs=navgs, overlap=0.5,
-                                    window='hamming', detrend=None)
-        # Find the time delay from the TF phase
-        delay[i], ix = signalproc.tf_delay(tf,
-                                           coh_limit=coh_limit,
-                                           freq_limit=freq_limit)
-
-        # Each delay and cloud vector implies a distance
-        cloud_dist[i] = -delay[i] * spatial.magnitude(cld_vec)
-        # How good was the coherence? Average across TF
-        tfsub = tf['coh'][tf.index < freq_limit]
-        coh[i] = np.sum(tfsub) / len(tfsub)
-        # coh[i] = np.sum(tf['coh']) / len(tf['coh'])  # Alt average of all TF
-
-    return cloud_dist, delay, coh

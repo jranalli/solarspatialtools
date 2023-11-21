@@ -124,6 +124,8 @@ A non-backwards-compatible major revision to incorporate field analysis and add 
 A non-backwards-compatible major revision to create a major speedup on the CMV.
 ##### Version 0.3.3
 Breaks backwards compatibility. Major speed improvements to field, via computation of the transfer function delays.
+##### Version 0.3.4
+Fixes to the way that field handles and excludes nan values. 
 
 ## Author
 Joe Ranalli  
