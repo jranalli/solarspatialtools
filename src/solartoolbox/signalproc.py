@@ -494,8 +494,7 @@ def tf_delay(tf, coh, coh_limit=0.6, freq_limit=0.02, method='fit'):
         # Perform the simultaneous least squares fit
         best, cov = leastsq(_residual, guess, args=args)
 
-        if np.all(np.isnan(tf)):
-            best*=np.nan
+        best[np.all(np.isnan(tf), axis=0)] = np.nan
         return best, ix
     else:
         raise ValueError(f'Invalid method: {method}')
