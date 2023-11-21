@@ -211,13 +211,13 @@ def compute_delays(df, ref, navgs=5, coh_limit=0.6, freq_limit=0.02,
 
             # How good was the coherence? Average across TF
             tfsub = coh_i[tf.index < freq_limit]
-            coh[i] = np.sum(tfsub.values) / len(tfsub)
+            coh[i] = np.nansum(tfsub.values) / len(tfsub)
 
     elif method == "multi":  # The most efficient method
         delay, ix = signalproc.tf_delay(tf, tfcoh, coh_limit=coh_limit,
                                         freq_limit=freq_limit, method='multi')
         freq_ix = tf.index < freq_limit
-        coh = np.sum(tfcoh.values[freq_ix, :], axis=0)/np.sum(freq_ix, axis=0)
+        coh = np.nansum(tfcoh.values[freq_ix, :], axis=0)/np.nansum(freq_ix, axis=0)
     else:
         raise ValueError(f"Invalid method: {method}")
     return delay, coh

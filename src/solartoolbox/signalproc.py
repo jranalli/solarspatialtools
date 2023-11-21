@@ -427,7 +427,7 @@ def tf_delay(tf, coh, coh_limit=0.6, freq_limit=0.02, method='fit'):
         # Simplifies to a linear relationship
         model = 2*np.pi*freqs*-dels
         diff = (phases - model) * mask
-        return np.sum(diff, axis=0)
+        return np.nansum(diff, axis=0)
 
     if isinstance(tf, pd.Series):
         return tf_delay(pd.DataFrame(tf), coh, coh_limit, freq_limit, method)
@@ -493,6 +493,9 @@ def tf_delay(tf, coh, coh_limit=0.6, freq_limit=0.02, method='fit'):
                 ix_coh[ix_freq1, :])
         # Perform the simultaneous least squares fit
         best, cov = leastsq(_residual, guess, args=args)
+
+        if np.all(np.isnan(tf)):
+            best*=np.nan
         return best, ix
     else:
         raise ValueError(f'Invalid method: {method}')
