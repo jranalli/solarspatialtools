@@ -125,7 +125,9 @@ A non-backwards-compatible major revision to create a major speedup on the CMV.
 ##### Version 0.3.3
 Breaks backwards compatibility. Major speed improvements to field, via computation of the transfer function delays.
 ##### Version 0.3.4
-Fixes to the way that field handles and excludes nan values. 
+Fixes to the way that field handles and excludes nan values.
+##### Version 0.3.5
+Improve variability stats and enable them to tolerate multi-column pandas types. Thanks to Scott Sheppard for the suggestion. 
 
 ## Author
 Joe Ranalli  

@@ -145,13 +145,13 @@ class TestVariabilityMetrics:
 
     def test_variability_index_null(self, variability_score_data):
         _, cs = variability_score_data
-        assert stats.variability_index(cs, cs, moving_avg_tau=1, norm=False)\
-               == approx(1)
+        vi = stats.variability_index(cs, cs, moving_avg_tau=1, norm=False)
+        assert vi.values == approx(1)
 
     def test_variability_index_basic(self, variability_score_data):
         data, cs = variability_score_data
-        assert stats.variability_index(data, cs, moving_avg_tau=1, norm=False)\
-               == approx((5937 + 2 * np.sqrt(2)) / 5939)
+        vi = stats.variability_index(data, cs, moving_avg_tau=1, norm=False)
+        assert vi.values == approx((5937 + 2 * np.sqrt(2)) / 5939)
 
     def test_variability_index_illegal(self, variability_score_data):
         data, cs = variability_score_data
@@ -160,9 +160,36 @@ class TestVariabilityMetrics:
 
     def test_variability_index_movingavg(self, variability_score_data):
         data, cs = variability_score_data
-        assert stats.variability_index(data, cs, moving_avg_tau=2, norm=False)\
-               == approx((2 * 2967 + 2 * np.sqrt(2 ** 2 + 0.5 ** 2))
-                         / (2 * 2969))
+        vi = stats.variability_index(data, cs, moving_avg_tau=2, norm=False)
+        assert vi.values == approx((2 * 2967 + 2 * np.sqrt(2 ** 2 + 0.5 ** 2))
+                                    / (2 * 2969))
+
+    @pytest.fixture
+    def variability_score_data_multi(self):
+        index = pd.date_range(start='2019-04-22 00:00:00',
+                              end='2019-04-26 02:59:59', freq='1min')
+        dat = 5 * np.ones([len(index), 3])
+        cols = ["ColName1", "ColName2", "ColName3"]
+        data = pd.DataFrame(dat.copy(), index=index, columns=cols)
+        cs = pd.DataFrame(dat.copy(), index=index, columns=cols)
+        data.iloc[5, :] = 6
+        return data, cs
+
+    def test_variability_index_null_multi(self, variability_score_data_multi):
+        _, cs = variability_score_data_multi
+        vi = stats.variability_index(cs, cs, moving_avg_tau=1, norm=False)
+        assert np.allclose(vi, 1)
+
+    def test_variability_index_basic_multi(self, variability_score_data_multi):
+        data, cs = variability_score_data_multi
+        vi = stats.variability_index(data, cs, moving_avg_tau=1, norm=False)
+        assert np.allclose(vi, (5937 + 2 * np.sqrt(2)) / 5939)
+
+    def test_variability_index_movingavg_multi(self, variability_score_data_multi):
+        data, cs = variability_score_data_multi
+        vi = stats.variability_index(data, cs, moving_avg_tau=2, norm=False)
+        assert np.allclose(vi, (2 * 2967 + 2 * np.sqrt(2 ** 2 + 0.5 ** 2))
+                                / (2 * 2969))
 
     def test_darr_zero(self, darr_data):
         data = darr_data
@@ -172,8 +199,9 @@ class TestVariabilityMetrics:
         data = darr_data
         data.iloc[2] = 6
 
-        assert stats.darr(data, moving_avg=False, pct=False) == approx(2)
-        assert stats.darr(data, pct=False) == approx(2)
+        assert (stats.darr(data, moving_avg=False, pct=False).values \
+                == approx(2))
+        assert stats.darr(data, pct=False).values == approx(2)
 
     def test_darr_illegal(self, darr_data):
         data = darr_data
@@ -184,18 +212,59 @@ class TestVariabilityMetrics:
     def test_darr_pct(self, darr_data):
         data = darr_data
         data.iloc[2] = 6
-        assert stats.darr(data, pct=True) == approx(2 * 100 / 1000)
+        assert stats.darr(data, pct=True).values == approx(2 * 100 / 1000)
 
     def test_darr_tau(self, darr_data):
         data = darr_data
         data.iloc[2] = 6
-        assert stats.darr(data, tau=2, moving_avg=False, pct=False)\
+        assert stats.darr(data, tau=2, moving_avg=False, pct=False).values \
                == approx(2)
 
     def test_darr_movingavg(self, darr_data):
         data = darr_data
         data.iloc[2] = 6
-        assert stats.darr(data, tau=2, moving_avg=True, pct=False) == approx(1)
+        assert (stats.darr(data, tau=2, moving_avg=True, pct=False).values \
+                == approx(1))
+
+    @pytest.fixture
+    def darr_data_multi(self):
+        index = pd.date_range(start='2019-04-22 00:00:00',
+                              end='2019-04-26 02:59:59', freq='1min')
+        dat = 5 * np.ones([len(index), 3])
+        cols = ["ColName1", "ColName2", "ColName3"]
+        data = pd.DataFrame(dat, index=index, columns=cols)
+        return data
+
+    def test_darr_zero_multi(self, darr_data_multi):
+        data = darr_data_multi
+        npt.assert_allclose(stats.darr(data, pct=False), 0)
+
+    def test_darr_basic_multi(self, darr_data_multi):
+        data = darr_data_multi
+        data.iloc[2, :] = 6
+
+        dar = stats.darr(data, moving_avg=False, pct=False)
+        assert np.allclose(dar, 2)
+        dar = stats.darr(data, pct=False)
+        assert np.allclose(dar, 2)
+
+    def test_darr_pct_multi(self, darr_data_multi):
+        data = darr_data_multi
+        data.iloc[2, :] = 6
+        dar = stats.darr(data, pct=True)
+        assert np.allclose(dar, 2 * 100 / 1000)
+
+    def test_darr_tau_multi(self, darr_data_multi):
+        data = darr_data_multi
+        data.iloc[2, :] = 6
+        dar = stats.darr(data, tau=2, moving_avg=False, pct=False)
+        assert np.allclose(dar, 2)
+
+    def test_darr_movingavg_multi(self, darr_data_multi):
+        data = darr_data_multi
+        data.iloc[2, :] = 6
+        dar = stats.darr(data, tau=2, moving_avg=True, pct=False)
+        assert np.allclose(dar, 1)
 
     def test_variability_score_basic(self, ghi):
         vs = stats.variability_score(ghi, tau=1, moving_avg=False, pct=False)
@@ -207,7 +276,7 @@ class TestVariabilityMetrics:
         assert vs == approx(1.2)  # 2 * 50% chance of being greater
         vs = stats.variability_score(pd.DataFrame(ghi), tau=1,
                                      moving_avg=False, pct=False)
-        assert vs == approx(1.2)  # 2 * 50% chance of being greater
+        assert vs.values == approx(1.2)  # 2 * 50% chance of being greater
 
     def test_variability_score_pct(self, ghi):
         vs = stats.variability_score(100 * ghi, tau=1,
@@ -221,3 +290,28 @@ class TestVariabilityMetrics:
     def test_variability_score_movingavg(self, ghi):
         vs = stats.variability_score(ghi, tau=2, moving_avg=True, pct=False)
         assert vs == approx(2)  # 1.5 * 66.667% chance of being greater
+
+    def test_variability_score_basic_multi(self, ghi):
+        dfghi = pd.DataFrame({1: ghi, 2: ghi, 3: ghi}, index=ghi.index)
+        vs = stats.variability_score(dfghi, tau=1, moving_avg=False, pct=False)
+        assert np.allclose(vs, 1.2)
+        assert vs.shape == (3,)
+
+    def test_variability_score_pct_multi(self, ghi):
+        dfghi = pd.DataFrame({1: ghi, 2: ghi, 3: ghi}, index=ghi.index)
+        vs = stats.variability_score(100 * dfghi, tau=1,
+                                     moving_avg=False, pct=True)
+        assert np.allclose(vs, 12)
+        assert vs.shape == (3,)
+
+    def test_variability_score_tau_multi(self, ghi):
+        dfghi = pd.DataFrame({1: ghi, 2: ghi, 3: ghi}, index=ghi.index)
+        vs = stats.variability_score(dfghi, tau=2, moving_avg=False, pct=False)
+        assert np.allclose(vs, 2.5)
+        assert vs.shape == (3,)
+
+    def test_variability_score_movingavg_multi(self, ghi):
+        dfghi = pd.DataFrame({1: ghi, 2: ghi, 3: ghi}, index=ghi.index)
+        vs = stats.variability_score(dfghi, tau=2, moving_avg=True, pct=False)
+        assert np.allclose(vs, 2)
+        assert vs.shape == (3,)

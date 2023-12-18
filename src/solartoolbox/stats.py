@@ -163,8 +163,9 @@ def variability_score(series, tau=1, moving_avg=True, pct=False):
 
     Parameters
     ----------
-    series : pandas.Series
-        a time series for which to calculate the Variability Score
+    series : pandas.Series or pandas.DataFrame
+        a time series for which to calculate the Variability Score. VS will
+        be calculated along axis 0.
 
     tau : numeric, default 1
         The number of timesteps for the increment calculation. series must use
@@ -195,11 +196,9 @@ def variability_score(series, tau=1, moving_avg=True, pct=False):
                                              moving_avg=False, pct=False)
 
     x = series.diff(tau)
-    vs = (x.abs() * (1. - x.abs().rank(pct=True))).max()
-    if isinstance(vs, (pd.Series, pd.DataFrame)):
-        return vs.values[0]
-    else:
-        return vs
+    vs = (x.abs() * (1. - x.abs().rank(pct=True))).max(axis=0)
+
+    return vs
 
 
 def variability_index(ghi, clearsky, moving_avg_tau=1, norm=False):
@@ -245,18 +244,14 @@ def variability_index(ghi, clearsky, moving_avg_tau=1, norm=False):
         cs = clearsky.resample(sample_pd).mean()
         return variability_index(rs, cs, moving_avg_tau=1, norm=norm)
     dt = (ghi.index[1] - ghi.index[0]).total_seconds() / 60
-    num = np.sqrt(ghi.diff() ** 2 + dt ** 2).sum()
-    den = np.sqrt(clearsky.diff() ** 2 + dt ** 2).sum()
+    num = np.sqrt(ghi.diff() ** 2 + dt ** 2).sum(axis=0)
+    den = np.sqrt(clearsky.diff() ** 2 + dt ** 2).sum(axis=0)
     if norm:  # Stein reports VI_dt = VI_1min/sqrt(dt)
         vi = num/den * np.sqrt(dt)
     else:
         vi = num/den
 
-    if isinstance(vi, (pd.Series, pd.DataFrame)):
-        return vi.values[0]
-    else:
-        return vi
-
+    return vi
 
 def darr(series, tau=1, moving_avg=True, pct=False):
     """
@@ -306,12 +301,9 @@ def darr(series, tau=1, moving_avg=True, pct=False):
     if pct:
         return darr(series * 100 / 1000, tau=tau, moving_avg=False, pct=False)
 
-    darr_val = np.abs(series.diff(tau)).sum()
-    if isinstance(darr_val, (pd.Series, pd.DataFrame)):
-        return darr_val.values[0]
-    else:
-        return darr_val
+    darr_val = np.abs(series.diff(tau)).sum(axis=0)
 
+    return darr_val
 
 def calc_quantile(timeseries, n_days="30d", quantile=0.9):
     """
