@@ -305,6 +305,7 @@ def darr(series, tau=1, moving_avg=True, pct=False):
 
     return darr_val
 
+
 def calc_quantile(timeseries, n_days="30d", quantile=0.9):
     """
     Calculate a single-day percentile-based summary of data by aggregating
@@ -345,7 +346,7 @@ def calc_quantile(timeseries, n_days="30d", quantile=0.9):
 
     ts = timeseries.copy()  # copy the data
 
-    out_df = pd.DataFrame()  # Create an empty holder
+    out_df = pd.Series()  # Create an empty holder
 
     end_day = ts.index.date[-1]  # the final day of the dataset
 
@@ -382,10 +383,11 @@ def calc_quantile(timeseries, n_days="30d", quantile=0.9):
                                    p90.index.astype(str))
 
         # Concat this day onto the output object
-        out_df = pd.concat((out_df, p90))
+        out_df = pd.concat((out_df, p90), axis=0)
 
     # localize the timeseries and the column names back to the input
     out_df = out_df.tz_localize(ts.index.tz).reindex(ts.index)
+    out_df = pd.DataFrame(out_df)
     try:
         out_df.columns = [name+'_quant' for name in ts.columns]
     except AttributeError:

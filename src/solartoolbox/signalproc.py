@@ -233,18 +233,18 @@ def averaged_tf(input_tsig, output_tsig,
     window : string (default 'hamming')
         The window type to use.
 
-    detrend : string
+    detrend : string or None
         Detrend type ('linear' or 'constant'). See scipy.signal.psdxx for more
         information.
 
     Returns
     -------
-    output : DataFrame
-        Pandas object containing the transfer function and coherence with an
-        index of the frequency.
-        Columns are:
-            'tf' - the complex transfer function
-            'coh' - the coherence
+    tf : pd.DataFrame
+        Complex valued transfer function indexed by the frequency and
+        containing the same columns as the input
+    coh : pd.DataFrame
+        the coherence indexed by the frequency and containing the same
+        columns as the input
     """
     dt = (input_tsig.index[1] - input_tsig.index[0]).total_seconds()
     fs = 1/dt
@@ -378,22 +378,31 @@ def tf_delay(tf, coh, coh_limit=0.6, freq_limit=0.02, method='fit'):
         include all points.
     method : str
         The method to use for computing the delay. Options are:
-            'diff' - unwrap phase and take derivative
+            'diff' - unwrap phase and take derivative (*not well validated)
             'fit' - fit a line to the phase
+            'multi' - fit a line to the phase for multiple tfs at once
 
     Returns
     -------
     delay : float
         The delay in seconds
-
+    ix : np.array(bool)
+        The mask used for filtering the phase
     """
 
     def _delay_fitter(x, delval):
         """
         Helper function for use with curve_fit. Computes the modeled phase.
-        :param x: the transfer function frequency
-        :param delval: The 'real' phase to fit the group delay to
-        :return: the modeled phase
+        Parameters
+        ----------
+        x :
+            the transfer function frequency
+        delval :
+            The 'real' phase to fit the group delay to
+        Returns
+        -------
+        model :
+            the modeled phase
         """
         # model = np.unwrap(np.angle(np.ones_like(x) *
         #                            np.exp(2 * np.pi * 1j * x * -delval)))
@@ -457,8 +466,8 @@ def tf_delay(tf, coh, coh_limit=0.6, freq_limit=0.02, method='fit'):
         avg_del = np.sum(gd * ix.flatten() / np.sum(ix))
         return avg_del, ix
 
-    # Method 2: curve fit the phase
     elif method == 'fit':
+        # Method 2: curve fit the phase
         if not np.any(np.array(np.shape(tf)) == 1):
             raise ValueError('tf must be a 1D array for method: fit')
         try:
@@ -476,6 +485,7 @@ def tf_delay(tf, coh, coh_limit=0.6, freq_limit=0.02, method='fit'):
                 warn('Curve fit failed for unknown reason. Returning NaN')
                 return np.nan, ix
     elif method == "multi":
+        # Method 3 : Operate on multiple tfs at a time using fit method
 
         # The guess for the delays
         guess = np.zeros((1, np.size(tf, axis=1)))
@@ -567,11 +577,11 @@ def compute_delays(ts_in, ts_out, mode='loop', scaling='coeff'):
         Time lag between the two timeseries at the maximum value of the cross
         correlation. Values are always integer multiples of the sampling period
         as the max correlation values are limited to the discrete time steps.
-    extra_data : dict{} or None
-        if compute_extras was true, additional info will be returned. Fields
-        are:
+    extra_data : dict{}
+        Additional data about the correlations. Values are:
+            'peak_corr' - the peak value of the correlation for each input ts
             'mean_corr' - the mean correlation for each input timeseries
-            'zero_zorr' - the correlation at zero_lag for each input timeseries
+            'zero_corr' - the correlation at zero_lag for each input timeseries
     """
     lags = signal.correlation_lags(len(ts_in), len(ts_in))
     dt = (ts_in.index[1] - ts_in.index[0]).total_seconds()
@@ -680,8 +690,9 @@ def apply_delay(tf, delay):
 
     Returns
     -------
-    A copy of the transfer function with the delay applied in rotating
-    the phase.
+    tf : pd.DataFrame
+        A copy of the transfer function with the delay applied in rotating
+        the phase.
     """
 
     tfi = tf.copy().values.flatten()
@@ -818,7 +829,7 @@ def plant1d_to_camfilter(plant, x_plant, cloud_speed):
 def apply_filter(input_tsig, comp_filt):
     """
     Apply a filter to a signal, and return the filtered signal. Works to align
-    the frequency axis of the computed filter with the
+    the frequency axis of the computed filter with the input signal.
 
     Parameters
     ----------

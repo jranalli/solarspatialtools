@@ -236,7 +236,6 @@ def unit(vec):
     -------
     (xi, yi) : numeric
         the 2-D cartesian vector scaled to a magnitude of 1
-
     """
     return vec / magnitude(vec)
 
@@ -254,7 +253,6 @@ def magnitude(vec):
     -------
     magnitude : numeric
         the magnitude of the vector
-
     """
     return np.sqrt(vec[0]**2+vec[1]**2)
 
@@ -275,7 +273,6 @@ def rect2pol(x, y):
     -------
     (r, theta) : numeric
         the polar form (r, theta) with theta in +/- pi radians
-
     """
     r = magnitude([x, y])
     theta = np.arctan2(y, x)
@@ -297,8 +294,6 @@ def pol2rect(r, theta):
     -------
     (x, y) : numeric
         a tuple of the vector
-
-
     """
 
     x = r * np.cos(theta)

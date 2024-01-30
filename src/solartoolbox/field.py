@@ -243,7 +243,7 @@ def remap_data(data, remap, columns=None):
 
     Parameters
     ----------
-    data : DataFrame
+    data : pd. DataFrame
         The original data to be remapped. Its index must be the names of the
         plant entities, with the columns representing data about them. One
         common use case might be the UTM coordinates of the entities with
@@ -257,7 +257,7 @@ def remap_data(data, remap, columns=None):
 
     Returns
     -------
-    DataFrame
+    data_fix : pd.DataFrame
         The remapped data frame
     """
     if columns is None:
@@ -393,7 +393,9 @@ def assign_positions(original_pos, predicted_pos):
     # values stay in place and remap the rest. This would only ever happen in
     # the predictions, because the original should come from the site plan.
     if np.any(np.isnan(predicted_pos)):
-        print("Some NaN values in the data, working around them.")
+        from warnings import warn
+        warn("Warning: Some NaN values in the data, analyzing only for real "
+             "valued positions.")
         # Remove the nans
         sub_pred = predicted_pos.dropna()
         sub_orig = original_pos.loc[sub_pred.index]
