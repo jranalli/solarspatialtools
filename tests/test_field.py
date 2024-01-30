@@ -161,3 +161,88 @@ def test_compute_delays_nan(delay_method):
 
     assert (delays[0:-1] == approx([0, delay, 2*delay, 3*delay], abs=2e-3))
     assert np.isnan(delays[-1])
+
+
+@pytest.fixture
+def position_data():
+    return pd.DataFrame({
+        'E': [1, 2, 3, 4, 5],
+        'N': [6, 7, 8, 9, 10]
+    }, index=['A', 'B', 'C', 'D', 'E'])
+
+
+@pytest.fixture
+def remap_reverse():
+    return [('A', 'E'), ('B', 'D'), ('C', 'C'), ('D', 'B'), ('E', 'A')]
+
+
+@pytest.fixture
+def remap_copy():
+    return [('A', 'A'), ('B', 'B'), ('C', 'C'), ('D', 'D'), ('E', 'E')]
+
+
+def test_assign_positions_types(position_data):
+    remap_indices, data_out = field.assign_positions(position_data,
+                                                     position_data)
+
+    assert isinstance(remap_indices, list)
+    assert all(isinstance(item, tuple) for item in remap_indices)
+    assert isinstance(data_out, pd.DataFrame)
+
+    assert len(remap_indices) == len(position_data)
+    assert set(data_out.index) == set(position_data.index)
+
+
+def test_assign_positions_duplicate(position_data):
+    remap_indices, data_out = field.assign_positions(position_data,
+                                                     position_data)
+
+    expected_remap = list(zip(position_data.index,
+                              position_data.index))
+    assert remap_indices == expected_remap
+
+
+def test_assign_positions_reverse(position_data):
+    # Check whether we can reverse the order of the positions and pick that up
+    predicted_pos = position_data.iloc[::-1]
+    remap_indices, data_out = field.assign_positions(position_data,
+                                                     predicted_pos)
+
+    expected_remap = list(zip(position_data.index,
+                              reversed(position_data.index)))
+    assert remap_indices == expected_remap
+
+
+def test_remap_data(position_data, remap_reverse):
+    data_out = field.remap_data(position_data, remap_reverse)
+
+    assert isinstance(data_out, pd.DataFrame)
+
+    for original, remapped in remap_reverse:
+        assert data_out.loc[original].equals(position_data.loc[remapped])
+
+
+def test_cascade_remap_nochange():
+    remap1 = [('A', 'B'), ('B', 'C'), ('C', 'A'), ('D', 'D')]
+    remap2 = [('A', 'A'), ('B', 'B'), ('C', 'C'), ('D', 'D')]
+
+    result = field.cascade_remap(remap1, remap2)
+
+    assert isinstance(result, list)
+    assert all(isinstance(item, tuple) for item in result)
+
+    expected_result = [('A', 'B'), ('B', 'C'), ('C', 'A'), ('D', 'D')]
+    assert result == expected_result
+
+
+def test_cascade_remap_changes():
+    remap1 = [('A', 'B'), ('B', 'C'), ('C', 'A'), ('D', 'D')]
+    remap2 = [('A', 'B'), ('B', 'C'), ('C', 'A'), ('D', 'D')]
+
+    result = field.cascade_remap(remap1, remap2)
+
+    assert isinstance(result, list)
+    assert all(isinstance(item, tuple) for item in result)
+
+    expected_result = [('A', 'C'), ('B', 'A'), ('C', 'B'), ('D', 'D')]
+    assert result == expected_result

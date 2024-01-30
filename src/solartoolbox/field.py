@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 
 from solartoolbox import spatial, cmv, signalproc
+from scipy.optimize import linear_sum_assignment
 
 warnings.filterwarnings("ignore",
                         message=".*Covariance of the parameters.*")
@@ -224,3 +225,220 @@ def compute_delays(df, ref, navgs=5, coh_limit=0.6, freq_limit=0.02,
     else:
         raise ValueError(f"Invalid method: {method}")
     return delay, coh
+
+
+def remap_data(data, remap, columns=None):
+    """
+    Remaps the data based on the remap indices. Each tuple is a pair of
+    entity names (indices), where the first index is the original location, and
+    the second index is the name of the combiner whose location is the true
+    location of the entity identified in the first index.
+
+    One common use case might be to operate on plant layout definition, where
+    the index is the name of the entity and the columns are the UTM
+    coordinates of the entity. This function could be used to swap entity
+    positions.
+
+    For more info on the remap input, see the `assign_positions` function.
+
+    Parameters
+    ----------
+    data : DataFrame
+        The original data to be remapped. Its index must be the names of the
+        plant entities, with the columns representing data about them. One
+        common use case might be the UTM coordinates of the entities with
+        columns 'E' and 'N'.
+    remap : list
+        The remap indices are a list of tuples, where the first element is the
+        identifier of the entity, and the second element is the entity whose
+        location is the true location of the first element index.
+    columns : list, optional
+        Specifies which columns to remap. If None, all columns are remapped.
+
+    Returns
+    -------
+    DataFrame
+        The remapped data frame
+    """
+    if columns is None:
+        columns = data.columns
+
+    # Fix the data to reflect the remapping
+    data_fix = data.copy()
+    for item in remap:
+        for column in columns:
+            data_fix[column][item[0]] = data[column][item[1]]
+    return data_fix
+
+
+def cascade_remap(remap1, remap2):
+    """
+    Cascades the effect of a remapping of a remapping. This function is useful
+    for situations where you've remapped the data once, and then you've
+    reprocessed that data under the new locations, and obtained a new
+    remapping. This function will combine the two remappings into a single
+    remapping that maps from the original data to the final remapped positions.
+
+    After applying an initial remapping, the second remapping has indices that
+    are now effectively scrambled by the new positions. Thus applying this in a
+    sense has the effect of merging the values of the first column from the
+    second remap into the second column from the first remap, and keeping the
+    outer values as the result. This is a bit confusing, but the example below
+    should help clarify.
+            remap1 = [('A', 'B'),
+                      ('B', 'C'),
+                      ('C', 'A')]
+            remap2 = [('A', 'B'),
+                      ('B', 'C'),
+                      ('C', 'A')]
+
+            result = [('A', 'C'),
+                      ('B', 'A'),
+                      ('C', 'B')]
+
+    Typically, values of remap inputs would be obtained from the
+    `assign_positions` function.
+
+    Parameters
+    ----------
+    remap1 : list of tuples
+        The original remapping. Each tuple is a pair of indices, where the
+        first index is the original location, and the second index is the name
+        of the combiner whose location is the true location of the first index.
+
+    remap2 : list of tuples
+        The second remapping. Each tuple is a pair of indices, where the first
+        index is the position within the remap1 space, and the second index is
+        the new remapping also within that already remapped space.
+
+    Returns
+    -------
+    out : list of tuples
+        The new remapping that maps from the original locations to the new
+        remapped positions after reprocessing.
+    """
+
+    # Put both into a dictionary
+    A = dict(remap1)
+    B = dict(remap2)
+
+    # Create an empty dictionary to hold the outputs
+    G = {}
+    for key in A:
+        G[key] = A[B[key]]
+
+    out = [(k, v) for k, v in G.items()]
+    out.sort(key=lambda tup: tup[0])  # sorts by 1st element in tuple
+    return out
+
+
+def assign_positions(original_pos, predicted_pos):
+    """
+    Compute the assignment solution to determine which predicted combiner
+    position corresponds to which original expected combiner position. The
+    assignment is done by minimizing the distance between the predicted and
+    expected combiner positions.
+
+    Understanding the outputs is a bit confusing, because we are mapping the
+    expected combiner positions to the predicted combiner positions and each
+    name therefore occurs twice, once in each column. So this will explain in
+    excruciating detail to make sure that it's totally clear.
+
+    The format of the the outputs is a list of tuples, where the first element
+    is the name of the name of the column in the original data. The second
+    element is the name of the element from the original data whose position in
+    the site plan corresponds to the first element.
+
+    For example:
+
+        [('A', 'B'), ('B', 'C'), ('C', 'A')]
+
+    means that the position for combiner 'B' in the original data should used
+    as the true position for combiner 'A'. The position for combiner 'C' in the
+    original data should be used as the true position for combiner 'B'. The
+    position for combiner 'A' in the original data should be used as the true
+    position for combiner 'C'.
+
+    Stated another way, the data for 'A' indicates that those time series are
+    really positioned at the ground position that was originally thought to be
+    'B'.
+
+    Parameters
+    ----------
+    original_pos : pd.DataFrame
+        A dataframe containing the expected combiner positions. The
+        dataframe should have at least two columns, the first two
+        columns are assumed to be the easting and northing positions of the
+        combiners in the site plan. Additional columns are ignored.
+
+    predicted_pos : pd.DataFrame
+        A dataframe containing the predicted combiner positions. The
+        dataframe should have at least two columns, the first two
+        columns are assumed to be the easting and northing positions of the
+        combiners in the predicted site plan. Additional columns are ignored.
+
+    Returns
+    -------
+    remap_indices : list of tuples
+        A list of tuples, where the first element is the name of the column in
+        the original data. The second element is the name of the element from
+        the original data whose original position corresponds to the first
+        element.
+
+    data_out : pd.DataFrame
+        A copy of the original data, but with the rows remapped to the optimal
+        solution.
+    """
+    # If we have NaN in the data, calculations will fail. Assume that the NaN
+    # values stay in place and remap the rest. This would only ever happen in
+    # the predictions, because the original should come from the site plan.
+    if np.any(np.isnan(predicted_pos)):
+        print("Some NaN values in the data, working around them.")
+        # Remove the nans
+        sub_pred = predicted_pos.dropna()
+        sub_orig = original_pos.loc[sub_pred.index]
+        # Get an optimized subset without the NaNs
+        subremap, _ = assign_positions(sub_orig, sub_pred)
+
+        # Build the indices by manually adding back the NaNs.
+        remap_indices = []
+        for k in original_pos.index:  # Loop over all the original entries
+            if np.any(np.isnan(predicted_pos.loc[k])):
+                # This was an NaN case, so just remap it to itself
+                remap_indices.append((k, k))
+            else:
+                # Find which optim. entry in subremap corresponds to this key
+                for pair in subremap:
+                    if pair[0] == k:
+                        # Insert it
+                        remap_indices.append(pair)
+    else:
+        # We have a good set of data, so compute the optimum
+
+        # Construct the cost matrix, which shows the distance for each combo
+        # from original to plan
+        C = np.zeros((len(original_pos), len(predicted_pos)))
+        E_plan = original_pos.values[:, 0]
+        N_plan = original_pos.values[:, 1]
+        E_delay = predicted_pos.values[:, 0]
+        N_delay = predicted_pos.values[:, 1]
+        for i in range(len(E_plan)):
+            for j in range(len(E_plan)):
+                # Error is the distances between the inferred and expected pts
+                C[i, j] = np.sqrt((E_plan[i] - E_delay[j]) ** 2 +
+                                  (N_plan[i] - N_delay[j]) ** 2
+                                  )
+
+        # Perform the optimization using scipy algorithm
+        row_ind, col_ind = linear_sum_assignment(C)
+
+        # Define the remapping from the original data to the new data
+        remap_indices = list(zip(original_pos.index[col_ind],
+                                 original_pos.index[row_ind]))
+        remap_indices.sort(key=lambda tup: tup[0])
+
+    # Create a fixed copy of the data to reflect the remapping
+    data_out = original_pos.copy()
+    data_out = remap_data(data_out, remap_indices)
+
+    return remap_indices, data_out
