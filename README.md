@@ -1,40 +1,59 @@
-# solartoolbox
-Solartoolbox is a collection of tools that are used for my research on solar 
-energy and data analysis of solar variability. I offer apologies in advance, 
-because I'm not a developer, but a solar energy researcher, so this isn't meant 
-to be a perfect API and may not exhibit best practices for software development 
-or programming. Rather, these tools are primarily published for my own use, but 
-are shared publicly if they may be valuable to other investigators or those who
-try to replicate my work. 
+# SolarToolbox
+`solartoolbox` is a package containing tools for dealing with analysis of solar 
+energy data. Its specific focus is on signal processing approaches and 
+addressing variability from a spatiotemporal perspective. Tools here might be 
+useful for dealing with distributed data sets, or performing analyses that 
+rely on a spatially distributed set of measurements.
 
-The primary features at present relate to working with multisite datasets for
-variability analysis, including via frequency domain approaches.
+# Installation
+The package can be most easily installed via [PyPi](https://pypi.org/project/solartoolbox/) 
+with the following command:
+```bash
+pip install solartoolbox
+```
 
-## Structure of the Library
-The codes are currently broken up in a way that made the most sense to me
+# Structure of the Library
+The codes are organized into a few subpackages and several function libraries.
+The subpackages are meant to contain tools that are related to a specific
+task. 
+
 ### Packages
 ```dataio```  
-A package with codes for accessing datasets that I've been working with and 
-converting them to a common format for use with the other codes. Current 
-datasets:
+A package with codes for accessing a couple of distributed irradiance datasets 
+that I've worked with and for converting them to a common format for use with 
+the other codes. Current datasets:
 - [HOPE and HOPE-MELPITZ](https://www.cen.uni-hamburg.de/en/icdc/data/atmosphere/samd-st-datasets.html)
 - [NRCAN High Resolution Datasets](https://www.nrcan.gc.ca/energy/renewable-electricity/solar-photovoltaic/18409)
 
 Some of these tools are meant to be used via the command line and some via
-code. There needs to be some cleanup done there to get things more universal, 
-but for now the codes are able to get the job done.
+function call. This area of the package may be in need of some cleanup to 
+improve consistency.
 
 ```visualization```  
 Tools for visualizing various types of data or constructing common plots that 
-might be useful for these analyses.
+might be useful for these analyses. Right now this only contains a function 
+for decorating the frequency axis of plots with common timescales. This is an 
+area that could use some expansion in the future.
 
 ```demos```  
-Some demonstration codes and jupyter notebooks to demonstrate usage of the 
-tools.
+Data and demonstration codes (including as jupyter notebooks) that demonstrate 
+the functionality of the package. An explanation the included data is 
+warranted. 
 
-### Function libraries
-```solartoolbox (root)```
-General tools or wrappers for other functions.
+- `sample_plant_1.h5` and `sample_plant_2.h5` 
+  -  Anonymized data from a ~20 MW and ~30 MW solar plant in the United States.
+  - Field `latlon` actually contains the UTM-like (East/North) centroid 
+  positions of individual combiners, anonymized with an arbitrary offset. 
+  Columns are `E` and `N` and units are meters.
+  - Fields `data_a`, `data_b` through `data_e` contain the combiner current 
+  measurements for five hours of operation throughout the year with known high 
+  variability. Sampling period is 10 seconds. The absolute time stamps are 
+    arbitrary and do not correspond to any real time.
+  - Combiner ids are used as column names for the `data` time series and 
+  correspond to the matching index of `latlon`
+  - See `cmv_demo.ipynb` and `field_demo.ipynb` for examples using this data.
+
+## Function libraries in solartoolbox (root level)
 
 ```cmv```  
 Functions for computing the cloud motion vector from a distributed irradiance 
@@ -92,7 +111,6 @@ for the id, while NRCAN uses a string.
 - Columns are labelled ```lat``` and ```lon``` and contain the lat and lon in 
 degrees for each of the distributed sensors.
 
-
 #### Irradiance Data
 Measurements consist of the individual sensor time series with a shared time 
 index. Upon use of ```pandas.read_hdf()``` the data will be brought into a 
@@ -102,32 +120,49 @@ DataFrame object. Each individual sensor has its own column.
 - Columns contain the time series for each individual sensor, and are keyed by
 the site id (HOPE - integer, NRCAN - string).
 
+# Contributing
+This project is happy to accept contributions and hear from users. The best way 
+to interact right now is to open an [issue](https://github.com/jranalli/solartoolbox/issues) 
+on GitHub. This is the best way to ask a question, make a suggestion about a 
+feature or describe a bug that you've encountered. 
 
+# License
+This project is licensed under the BSD 3-Clause License - see the 
+[LICENSE](https://github.com/jranalli/solartoolbox/blob/main/LICENSE) file
+for full details. 
 
-## Significant Changelog
-##### Version 0.2
-First public release
-##### Version 0.2.1
-Add wrapper for `pvlib.clearsky_index` to handle pandas type
-##### Version 0.2.2
-Change input to camfilter to handle references that don't coincide with the 
-site itself. This change breaks code!
-##### Version 0.2.3
-Add methods for calculating delay between signals to `signalproc`
-##### Version 0.2.4
-Add some additional options to CMV code
-##### Version 0.2.5
-Add field analysis.
-##### Version 0.3.1
-A non-backwards-compatible major revision to incorporate field analysis and add more comprehensive testing.
-##### Version 0.3.2
-A non-backwards-compatible major revision to create a major speedup on the CMV.
-##### Version 0.3.3
-Breaks backwards compatibility. Major speed improvements to field, via computation of the transfer function delays.
-##### Version 0.3.4
-Fixes to the way that field handles and excludes nan values.
-##### Version 0.3.5
-Improve variability stats and enable them to tolerate multi-column pandas types. Thanks to Scott Sheppard for the suggestion. 
+# History
+Solartoolbox began as a library of tools developed to support my own research 
+activities on solar energy. It was always shared publicly to encourage use by 
+interested parties and make a small contribution to open science and promoting
+reproducibility in the field. As a result, most initial releases lacked full 
+documentation and the structure of the library underwent some significant 
+changes as they adapted to my own changing needs from project to project. Some 
+artifacts of that history may still be present in the code and certainly are 
+reflected by the commit history.
+
+Beginning with Version 0.3.1 and the introduction of the field analysis 
+package, I began to see the potential for broader interest in the tools
+which may lead to a greater need to accommodate other users. As such, I began 
+to improve documentation and testing with that release and hope to reach a more
+stable and consistent structure for the library. The expectation is that the 
+packages `cmv` and `field` will be the most broadly useful to the research 
+community and have been the focus of additional testing, documentation and 
+tutorial development.
+
+# Relationship with other packages
+This package is not meant to replace or compete with well established packages 
+like [pvlib](https://github.com/pvlib/pvlib-python) or
+[pvanalytics](https://github.com/pvlib/pvanalytics). Instead, the focus is to 
+serve as a complement to those packages, especially in offering functionality 
+that would otherwise be out of scope for their mission. When overlap occurs, 
+functionality developed here will be contributed to those more mature packages
+if they are deemed in scope or suitable by the maintainers of those packages.
+
+For example, the `pvlib-python` port of the Wavelet Variability Model was 
+initially developed as part of this package, but was later contributed to 
+`pvlib-python` in the [scaling](https://pvlib-python.readthedocs.io/en/stable/reference/generated/pvlib.scaling.wvm.html) 
+module thereof.
 
 ## Author
 Joe Ranalli  
