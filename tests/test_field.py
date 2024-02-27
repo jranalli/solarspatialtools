@@ -92,7 +92,7 @@ def test_compute_predicted_position_static(refdat):
     cmv_a = spatial.pol2rect(9.52, 0.62)
     cmv_b = spatial.pol2rect(8.47, 2.17)
 
-    pos_utm = pd.read_hdf(datafile, mode="r", key="latlon")
+    pos_utm = pd.read_hdf(datafile, mode="r", key="utm")
 
     df_a = pd.read_hdf(datafile, mode="r", key="data_a")
     df_b = pd.read_hdf(datafile, mode="r", key="data_b")
