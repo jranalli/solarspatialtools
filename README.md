@@ -98,18 +98,24 @@ All data is collected into a single H5 file containing multiple fields. I use
 into python. 
 
 - ```latlon```: The latitude/longitude of the individual measurement sites
+- ```utm```: The UTM coordinates of the individual measurement sites
 - ```data```: Global Horizontal Irradiance
 - ```data_tilt```: Global Tilted Irradiance (if available)
 
 #### Location Data
-Data about the location of each individual site is stored in the H5 file with 
-the key ```latlon``` as stated above. Upon use of ```pandas.read_hdf()``` the 
-data will be brought into a DataFrame object.
+Data about the location of each individual site is stored in the H5 file. Two
+possible keys are used depending on the projection. Both are available when 
+possible. The key ```latlon``` represents the site in a latitude coordinate
+system. The key ```utm``` will contain the positions using UTM (or similar) 
+projection that attempts to place the layout into a rectilinear coordinates. 
+Upon use of ```pandas.read_hdf()``` the data will be brought into a DataFrame 
+object.
 
 - The index of the DataFrame is the site id. The HOPE datasets use an integer 
 for the id, while NRCAN uses a string. 
 - Columns are labelled ```lat``` and ```lon``` and contain the lat and lon in 
-degrees for each of the distributed sensors.
+degrees for each of the distributed sensors (or ```E```, ```N``` in the case of 
+```utm```).
 
 #### Irradiance Data
 Measurements consist of the individual sensor time series with a shared time 

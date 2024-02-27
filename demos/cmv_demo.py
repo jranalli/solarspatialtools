@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from solartoolbox import cmv, spatial
 
 datafile = "data/sample_plant_2.h5"
-pos_utm = pd.read_hdf(datafile, mode="r", key="latlon")
+pos_utm = pd.read_hdf(datafile, mode="r", key="utm")
 df = pd.read_hdf(datafile, mode="r", key="data_a")
 
 hourlymax = np.mean(df.quantile(0.95))
@@ -60,8 +60,8 @@ for pair, lag in zip(dat_jam.allpairs, dat_jam.pair_lag):
 
 # Insert data back into the DataFrame for plotting
 pos_utm['lag'] = np.zeros_like(pos_utm['E'])
-pos_utm['lag'][points] = lags
-pos_utm['lag'][ref] = 0
+pos_utm.loc[points, 'lag'] = lags
+pos_utm.loc[ref, 'lag'] = 0
 
 
 plt.scatter(pos_utm['E'], pos_utm['N'], c=-pos_utm['lag'], cmap='viridis')

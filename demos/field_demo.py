@@ -20,7 +20,7 @@ cmv_b = spatial.pol2rect(8.47, 2.17)
 # pos_utm is a pandas DataFrame. The index is the combiner ID, and the columns
 # 'E' and 'N' specify the combiner position East and North in a UTM-like
 # geographic projection
-pos_utm = pd.read_hdf(datafile, mode="r", key="latlon")
+pos_utm = pd.read_hdf(datafile, mode="r", key="utm")
 
 # df_a contains the individual time series for each combiner. The index is
 # the time (with an arbitrary offset, so it begins at 00:00:00). The columns
