@@ -8,7 +8,7 @@ from scipy.stats import linregress
 from scipy.optimize import linear_sum_assignment, shgo
 
 def main():
-    fn = 'data/hope-melpitz-qcinterp.h5'
+    fn = 'data/hope_melpitz_10s.h5'
     avg_interval = '1h'
     day_start = '2013-09-08 00:00:00'
     day_stop = '2013-09-12 00:00:00'
@@ -19,7 +19,6 @@ def main():
 
 
     ts = ts[np.logical_and(day_start<ts.index, ts.index<day_stop)]
-    ts = ts.resample('10s').mean()
 
     vs = ts.resample(avg_interval).apply(
                     lambda x: stats.variability_score(x[ts.columns]))
@@ -53,20 +52,21 @@ def main():
     pd.options.display.max_rows = None
     print(cmvs)
 
-    subcmvs = optimize_spread(cmvs)
-    print(subcmvs)
+    indices = optimum_subset(*spatial.pol2rect(cmvs.cld_spd, cmvs.cld_dir_rad))
+    print(cmvs.iloc[indices])
 
 
-def optimize_spread(cmvs, n=10):
+def optimum_subset(cmvx, cmvy, n=10, cmvs=None):
     """
     Chooses a diverse set of vectors given the full set of vectors. Operates
-    in 2 quadrants only subject to the assumption that anti-parallels are also
+    in 2 quadrants only, subject to the assumption that anti-parallels are also
     undesirable.
 
     Parameters
     ----------
     cmvs : pd.DataFrame
         The full set of CMVs.
+        Must contain columns cld_spd and cld_dir_rad
 
     n : int
         The number of vectors to select
@@ -78,9 +78,12 @@ def optimize_spread(cmvs, n=10):
     """
 
     # Compute unit vectors representing the CMVs
-    cmvx, cmvy = spatial.pol2rect(cmvs.cld_spd, cmvs.cld_dir_rad)
-    cmvx /= cmvs.cld_spd
-    cmvy /= cmvs.cld_spd
+    cld_spd = []
+    for x, y in zip(cmvx, cmvy):
+        cld_spd.append(spatial.magnitude((x, y)))
+    cld_spd = np.array(cld_spd)
+    cmvx /= cld_spd
+    cmvy /= cld_spd
     cmv_vecs = np.array([cmvx, cmvy]).T
 
     def calc_cost(ang_0):
@@ -98,7 +101,7 @@ def optimize_spread(cmvs, n=10):
         indices : the indices of the CMVs in the optimal assignment
         """
         # Compute unit vectors equally distributed around 180 deg.
-        ideal_angs = np.arange(0, n)/n * np.pi + ang_0
+        ideal_angs = np.arange(0, n) / n * np.pi + ang_0
         ideal_vecs = np.array([np.cos(ideal_angs), np.sin(ideal_angs)]).T
 
         # Compute cost as dot products between each CMV and each ideal vector
@@ -122,16 +125,19 @@ def optimize_spread(cmvs, n=10):
 
     # The bounds of the optimization are limited by the spacing between ideal
     # vectors.
-    bounds = [(0, np.pi/n)]
+    bounds = [(0, np.pi / n)]
 
     #  What we're optimizing here is a rotation angle for the set of ideal vecs
     y = shgo(cost_wrapper, bounds)
 
     # Use the optimized angle to figure out which CMVs to use
     final_cost, indices = calc_cost(y.x[0])
-    cmvs_subset = cmvs.copy().iloc[indices]
 
-    return cmvs_subset
+    if cmvs is not None:
+        cmvs_subset = cmvs.copy().iloc[indices]
+        return indices, cmvs_subset
+    else:
+        return indices
 
 
 if __name__ == "__main__":
