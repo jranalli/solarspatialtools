@@ -367,9 +367,9 @@ def optimum_subset(cmvx, cmvy, n=10):
     for x, y in zip(cmvx, cmvy):
         cld_spd.append(magnitude((x, y)))
     cld_spd = np.array(cld_spd)
-    cmvx /= cld_spd
-    cmvy /= cld_spd
-    cmv_vecs = np.array([cmvx, cmvy]).T
+    cmv_x = cmvx / cld_spd
+    cmv_y = cmvy / cld_spd
+    cmv_vecs = np.array([cmv_x, cmv_y]).T
 
     def calc_cost(ang_0):
         """
