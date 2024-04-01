@@ -20,7 +20,7 @@ def main():
     # ##### INPUTS ##### #
 
     # The file name
-    fn = "data/hope-melpitz-qcinterp.h5"
+    fn = "data/hope_melpitz_1s.h5"
 
     # This model has a known cloud speed and direction during this time
     twin = pd.date_range('2013-09-08 9:15:00', '2013-09-08 10:15:00',
