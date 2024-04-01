@@ -40,18 +40,39 @@ Data and demonstration codes (including as jupyter notebooks) that demonstrate
 the functionality of the package. An explanation the included data is 
 warranted. 
 
-- `sample_plant_1.h5` and `sample_plant_2.h5` 
-  -  Anonymized data from a ~20 MW and ~30 MW solar plant in the United States.
-  - Field `latlon` actually contains the UTM-like (East/North) centroid 
+- Anonymized Plant Combiner Data  
+  - Anonymized combiner time series data from ~20 MW (`sample_plant_1.h5`) and 
+  ~30 MW (`sample_plant_2.h5`) solar plants in the United States.
+  - Field `utm` actually contains the UTM-like (East/North) centroid 
   positions of individual combiners, anonymized with an arbitrary offset. 
   Columns are `E` and `N` and units are meters.
   - Fields `data_a`, `data_b` through `data_e` contain the combiner current 
   measurements for five hours of operation throughout the year with known high 
   variability. Sampling period is 10 seconds. The absolute time stamps are 
-    arbitrary and do not correspond to any real time.
+  arbitrary and do not correspond to any real time. Data are normalized for 
+  anonymization.
   - Combiner ids are used as column names for the `data` time series and 
-  correspond to the matching index of `latlon`
+  correspond to the matching index of `utm`
   - See `cmv_demo.ipynb` and `field_demo.ipynb` for examples using this data.
+- HOPE Melpitz Campaign Data
+  - Subset of data from the HOPE-Melpitz campaign of time series from 50 
+  distributed irradiance sensors. For details on this data, refer to: 
+  [Macke et al. (2017)](https://doi.org/10.5194/acp-17-4887-2017) 
+  and [Dataset Website](https://www.cen.uni-hamburg.de/en/icdc/data/atmosphere/samd-st-datasets.html)
+    - `hope_melpitz_1s` contains data sampled at 1s time resolution. 
+      - Covers a single hour of data (9:15 - 10:15 UTC on Sept 8, 2013).
+    - `hope_melpitz_10s` contains data sampled at 10s time resolution, acquired
+    by temporally averaging time series data from the original dataset. 
+      - Covers 3 full days, from Sept 8 - Sept 11, 2013.
+  - In both cases, data were first postprocessed using only removal of nulls 
+  (-9999) and linear interpolation to fill gaps left by the nulls, with a 
+  maximum interpolation window of 5s. See `dataio.hope_campaign` for details on
+  those postprocessing steps.
+  - Fields are `latlon`, `utm`, and `data`. 
+  - Numerical sensor IDs match those from the original dataset, and original
+  timestamps are preserved in the `data` field. All timestamps are UTC.
+  - See `dataio\hope_campaign.py` for details on the original dataset.
+  - See `signalproc_demo.py` for examples using this data. 
 
 ## Function libraries in solartoolbox (root level)
 

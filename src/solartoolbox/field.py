@@ -17,7 +17,8 @@ def compute_predicted_position(dfs, pos_utm, ref, cld_vecs=None,
     """
     Compute the predicted position of a combiner based upon the cloud movement.
     Requires two separate inputs with different CMV directions. Inputs are
-    provided as lists containing the data about the two different cases.
+    provided as lists containing the data about the two different cases. For
+    reference on the method, refer to [1]_.
 
     Parameters
     ----------
@@ -65,6 +66,13 @@ def compute_predicted_position(dfs, pos_utm, ref, cld_vecs=None,
         the cloud motion for that particular time along the cloud motion dir.
         Delay is the raw value of tf delay for each of the points relative to
         the reference. coh is the average coherence for that transfer function.
+
+    References
+    ----------
+    .. [1] Ranalli, J., Hobbs, W., 2024. PV Plant Equipment Labels and
+       Layouts Can Be Validated by Analyzing Cloud Motion in Existing Plant
+       Measurements. IEEE Journal of Photovoltaics.
+       :doi:`https://doi.org/10.1109/JPHOTOV.2024.3366666`
     """
 
     # Note: This approach computes results for a single reference. The sub-
