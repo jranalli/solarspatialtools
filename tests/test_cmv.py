@@ -98,7 +98,7 @@ def test_cmv_artificial(theta_deg, velocity, mode):
 
 def test_cmv_gagne_data():
     datafile = "../demos/data/sample_plant_1.h5"
-    pos_utm = pd.read_hdf(datafile, mode="r", key="latlon")
+    pos_utm = pd.read_hdf(datafile, mode="r", key="utm")
     df = pd.read_hdf(datafile, mode="r", key="data_a")
 
     hourlymax = np.mean(df.quantile(0.95))
@@ -116,7 +116,7 @@ def test_cmv_gagne_data():
 
 def test_cmv_jamaly_data():
     datafile = "../demos/data/sample_plant_1.h5"
-    pos_utm = pd.read_hdf(datafile, mode="r", key="latlon")
+    pos_utm = pd.read_hdf(datafile, mode="r", key="utm")
     df = pd.read_hdf(datafile, mode="r", key="data_a")
 
     hourlymax = np.mean(df.quantile(0.95))
@@ -134,7 +134,7 @@ def test_cmv_jamaly_data_ref():
     # A test using a reference when we calculate the CMV
 
     datafile = "../demos/data/sample_plant_1.h5"
-    pos_utm = pd.read_hdf(datafile, mode="r", key="latlon")
+    pos_utm = pd.read_hdf(datafile, mode="r", key="utm")
     df = pd.read_hdf(datafile, mode="r", key="data_a")
 
     hourlymax = np.mean(df.quantile(0.95))
