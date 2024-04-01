@@ -3,7 +3,9 @@ from scipy.optimize import minimize_scalar, leastsq
 
 from solartoolbox.signalproc import compute_delays
 from solartoolbox.spatial import project_vectors, compute_vectors
-from solartoolbox.spatial import pol2rect, magnitude
+from solartoolbox.spatial import pol2rect, magnitude, dot
+
+from scipy.optimize import linear_sum_assignment, shgo
 
 from enum import Enum
 import itertools
@@ -327,6 +329,96 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
     outdata.method_data = method_out
 
     return cmv_vel, cmv_theta, outdata
+
+
+def optimum_subset(cmvx, cmvy, n=10):
+    """
+    Chooses a subset of vectors from within a full set of vectors, based on
+    optimizing the most diverse angles available. Operates in 2 quadrants only,
+    subject to the assumption that anti-parallels are also undesirable.
+
+    This is useful for getting vectors that represent a variety of directions.
+    For example, given all the CMVs for a whole year, this will provide a list
+    of the time periods with the most varied cloud motion directions. One use
+    case is in field analysis where the most diverse set of CMVs is needed to
+    get the highest probability of perpendicular vector pairs.
+
+    Parameters
+    ----------
+    cmvx : pd.Series
+        A list of x-components of the CMVs
+
+    cmvy : pd.Series
+        A list of y-components of the CMVs
+
+    n : int
+        The number of vectors to select
+
+    Returns
+    -------
+    indices : list
+        The indices of the CMVs that are most diverse. Indices are positional
+        within the input arrays. For example, could be used to reduce a
+        DataFrame to the most diverse CMVs by using df.iloc[indices]
+    """
+
+    # Compute unit vectors representing the CMVs
+    cld_spd = []
+    for x, y in zip(cmvx, cmvy):
+        cld_spd.append(magnitude((x, y)))
+    cld_spd = np.array(cld_spd)
+    cmvx /= cld_spd
+    cmvy /= cld_spd
+    cmv_vecs = np.array([cmvx, cmvy]).T
+
+    def calc_cost(ang_0):
+        """
+        Compute the cost function associated with using each CMV as a member of
+        the set relative to the ideal set of equally spaced vectors.
+
+        Parameters
+        ----------
+        ang_0 : the rotation angle of the ideal vectors in radians
+
+        Returns
+        -------
+        cost : the total cost of the assignment
+        indices : the indices of the CMVs in the optimal assignment
+        """
+        # Compute unit vectors equally distributed around 180 deg.
+        ideal_angs = np.arange(0, n) / n * np.pi + ang_0
+        ideal_vecs = np.array([np.cos(ideal_angs), np.sin(ideal_angs)]).T
+
+        # Compute cost as dot products between each CMV and each ideal vector
+        # Absolute value used because both parallel and anti-parallel are bad
+        # for our case.
+        dots = -np.array([np.abs(dot(cmv_vecs.T, ideal_vec))
+                          for ideal_vec in ideal_vecs])
+
+        # Compute the optimal assignment of CMVs to maximize alignment with the
+        # ideal vectors. Relative cost could be used to compare multiple zero
+        # angles.
+        r_ind, c_ind = linear_sum_assignment(dots)
+        cost = dots[r_ind, c_ind].sum()
+        return cost, c_ind
+
+    def cost_wrapper(ang_0):
+        """
+        The minimizer only works on a single output, so in this case we wrap it
+        """
+        return calc_cost(ang_0)[0]  # return only the cost
+
+    # The bounds of the optimization are limited by the spacing between ideal
+    # vectors.
+    bounds = [(0, np.pi / n)]
+
+    #  What we're optimizing here is a rotation angle for the set of ideal vecs
+    y = shgo(cost_wrapper, bounds)
+
+    # Use the optimized angle to figure out which CMVs to use
+    final_cost, indices = calc_cost(y.x[0])
+
+    return indices
 
 
 def _pairwise_qc(pairs, spacing, sigs, delay, peak_corr, mean_corr,

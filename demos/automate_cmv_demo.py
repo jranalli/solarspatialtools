@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 from solartoolbox import stats, spatial, cmv
 
 from scipy.stats import linregress
-from scipy.optimize import linear_sum_assignment, shgo
 
 def main():
     fn = 'data/hope_melpitz_10s.h5'
@@ -52,92 +51,11 @@ def main():
     pd.options.display.max_rows = None
     print(cmvs)
 
-    indices = optimum_subset(*spatial.pol2rect(cmvs.cld_spd, cmvs.cld_dir_rad))
+    indices = cmv.optimum_subset(*spatial.pol2rect(cmvs.cld_spd, cmvs.cld_dir_rad))
+    print(indices)
     print(cmvs.iloc[indices])
 
 
-def optimum_subset(cmvx, cmvy, n=10, cmvs=None):
-    """
-    Chooses a diverse set of vectors given the full set of vectors. Operates
-    in 2 quadrants only, subject to the assumption that anti-parallels are also
-    undesirable.
-
-    Parameters
-    ----------
-    cmvs : pd.DataFrame
-        The full set of CMVs.
-        Must contain columns cld_spd and cld_dir_rad
-
-    n : int
-        The number of vectors to select
-
-    Returns
-    -------
-    cmvs_subset : pd.DataFrame
-        The subset of CMVs that are most diverse
-    """
-
-    # Compute unit vectors representing the CMVs
-    cld_spd = []
-    for x, y in zip(cmvx, cmvy):
-        cld_spd.append(spatial.magnitude((x, y)))
-    cld_spd = np.array(cld_spd)
-    cmvx /= cld_spd
-    cmvy /= cld_spd
-    cmv_vecs = np.array([cmvx, cmvy]).T
-
-    def calc_cost(ang_0):
-        """
-        Compute the cost function associated with using each CMV as a member of
-        the set relative to the ideal set of equally spaced vectors.
-
-        Parameters
-        ----------
-        ang_0 : the rotation angle of the ideal vectors in radians
-
-        Returns
-        -------
-        cost : the total cost of the assignment
-        indices : the indices of the CMVs in the optimal assignment
-        """
-        # Compute unit vectors equally distributed around 180 deg.
-        ideal_angs = np.arange(0, n) / n * np.pi + ang_0
-        ideal_vecs = np.array([np.cos(ideal_angs), np.sin(ideal_angs)]).T
-
-        # Compute cost as dot products between each CMV and each ideal vector
-        # Absolute value used because both parallel and anti-parallel are bad
-        # for our case.
-        dots = -np.array([np.abs(spatial.dot(cmv_vecs.T, ideal_vec))
-                          for ideal_vec in ideal_vecs])
-
-        # Compute the optimal assignment of CMVs to maximize alignment with the
-        # ideal vectors. Relative cost could be used to compare multiple zero
-        # angles.
-        r_ind, c_ind = linear_sum_assignment(dots)
-        cost = dots[r_ind, c_ind].sum()
-        return cost, c_ind
-
-    def cost_wrapper(ang_0):
-        """
-        The minimizer only works on a single output, so in this case we wrap it
-        """
-        return calc_cost(ang_0)[0]  # return only the cost
-
-    # The bounds of the optimization are limited by the spacing between ideal
-    # vectors.
-    bounds = [(0, np.pi / n)]
-
-    #  What we're optimizing here is a rotation angle for the set of ideal vecs
-    y = shgo(cost_wrapper, bounds)
-
-    # Use the optimized angle to figure out which CMVs to use
-    final_cost, indices = calc_cost(y.x[0])
-
-    if cmvs is not None:
-        cmvs_subset = cmvs.copy().iloc[indices]
-        return indices, cmvs_subset
-    else:
-        return indices
 
 
 if __name__ == "__main__":
