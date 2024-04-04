@@ -223,7 +223,7 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
 
     # Perform the Gagne QC, which looks for correlation on the whole set to
     # decide which pairs are worth using
-    overall_flag = None
+    overall_flag = Flag.GOOD
     if method == 'gagne':
         corr_inds = corr_lag >= 0.99
         if sum(corr_inds[pair_flags == Flag.GOOD]) < 12:
