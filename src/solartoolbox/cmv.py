@@ -6,6 +6,7 @@ from solartoolbox.spatial import project_vectors, compute_vectors
 from solartoolbox.spatial import pol2rect, magnitude, dot
 
 from scipy.optimize import linear_sum_assignment, shgo
+from scipy.stats import linregress
 
 from enum import Enum
 import itertools
@@ -287,6 +288,17 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
         method_out['error_index'] = err
         method_out['velocity'] = velocity
 
+        # Compute a few extra statistics for the good pairs
+        try:
+            _, _, r_corr, _, std_err = linregress(delay_good, cmv_dir_dist)
+        except ValueError:
+            r_corr = 0
+            std_err = 0
+        ngood = len(vectors_good)
+        method_out['r_corr'] = r_corr
+        method_out['stderr_corr'] = std_err
+        method_out['ngood'] = ngood
+
     elif method == 'gagne':
         # Function to apply least squares to
         def resid(p, lag, coeff_vecs):
@@ -560,6 +572,9 @@ def _validate_method_options(method, options):
             'v40': None,  # 40th percentile velocity
             'r_qc': [],  # Ratio of peak to mean xcorr
             'var_s': [],  # Variation ratio of signals [s0, s1]
+            'r_corr': None,  # Corr. coeff. for dist/delay for good pairs
+            'stderr_corr': None,  # Std. error for dist/delay for good pairs
+            'ngood': None,  # Number of good pairs
         }
     elif method == 'gagne':
         defaults = {

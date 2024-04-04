@@ -4,8 +4,6 @@ import matplotlib.pyplot as plt
 
 from solartoolbox import stats, spatial, cmv
 
-from scipy.stats import linregress
-
 # This is a demo of automatically detecting CMVs within a time series and
 # filtering to high variability periods with diverse cloud motion directions.
 
@@ -43,8 +41,9 @@ vs = ts.resample(avg_interval).apply(
 # CMVs, since CMV is computationally expensive. Compute the median of the
 # variability score for each hour and sort the values in descending order. Save
 # the 20 with the highest Variability Score.
+n_var = 20
 vs = vs.median(axis=1).sort_values(ascending=False)
-vs = vs.iloc[0:20]
+vs = vs.iloc[0:n_var]
 print(vs)
 
 # ################
@@ -74,16 +73,7 @@ for date in vs.index:
     # Store the global flag
     cmvs_flags.append(dat.flag)
 
-    # Perform a linear regression on the pairs to see the quality of the match
-    # between the lag and the distance (i.e. how consistent is velocity over
-    # the plant?).
-    s, i, r, p, se = linregress(dat.pair_lag[dat.pair_flag == cmv.Flag.GOOD], dat.pair_dists[dat.pair_flag == cmv.Flag.GOOD])
-
-    # Store the outputs
-    dat.ngood = np.sum(dat.pair_flag == cmv.Flag.GOOD)
-    dat.rval = r
-    dat.stderr = se
-    cmvs.loc[date] = [cld_spd, cld_dir, hourlymax, dat.ngood, dat.rval, dat.stderr, np.abs(dat.method_data["error_index"])]
+    cmvs.loc[date] = [cld_spd, cld_dir, hourlymax, dat.method_data['ngood'], dat.method_data['r_corr'], dat.method_data['stderr_corr'], np.abs(dat.method_data["error_index"])]
 
 # Display the 20 CMVs we just acquired
 pd.options.display.max_columns = None
@@ -95,8 +85,8 @@ print(cmvs)
 # # SELECT THE BEST CMVs #
 # ########################
 
-# First we'll do some filtering on the quality. These are a bit arbitrary and
-# will very likely require tuning from dataset to dataset.
+# First we'll do some filtering on the quality. These limits are a bit
+# arbitrary and will very likely require tuning from dataset to dataset.
 ngood_min = 200
 rval_min = 0.85
 bad_inds = []
@@ -118,6 +108,10 @@ cmvs = cmvs.drop(index=bad_inds)
 vx, vy = spatial.pol2rect(cmvs.cld_spd, cmvs.cld_dir_rad)
 indices = cmv.optimum_subset(vx, vy, n=5)
 print(cmvs.iloc[indices])
+
+# ########################
+# # PLOT THE CHOSEN CMVs #
+# ########################
 
 # Plot the vectors visually
 plt.figure()
