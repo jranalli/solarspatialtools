@@ -63,7 +63,7 @@ warranted.
       - Covers a single hour of data (9:15 - 10:15 UTC on Sept 8, 2013).
     - `hope_melpitz_10s` contains data sampled at 10s time resolution, acquired
     by temporally averaging time series data from the original dataset. 
-      - Covers 3 full days, from Sept 8 - Sept 11, 2013.
+      - Covers 4 full days, from Sept 8 - Sept 11, 2013.
   - In both cases, data were first postprocessed using only removal of nulls 
   (-9999) and linear interpolation to fill gaps left by the nulls, with a 
   maximum interpolation window of 5s. See `dataio.hope_campaign` for details on

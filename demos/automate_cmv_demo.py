@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import pvlib
 
 from solartoolbox import stats, spatial, cmv
 
@@ -21,11 +22,17 @@ from solartoolbox import stats, spatial, cmv
 # # LOAD DATA #
 # #############
 
-# Load 3 days of data from the HOPE campaign.
+# Load 4 days of data from the HOPE campaign.
 fn = 'data/hope_melpitz_10s.h5'
 pos = pd.read_hdf(fn, mode="r", key="latlon")
 pos_utm = spatial.latlon2utm(pos['lat'], pos['lon'])
 ts = pd.read_hdf(fn, mode="r", key="data")
+
+# We will need the clear sky index for the CMV calculation, so let's compute it
+# now.
+loc = pvlib.location.Location(np.mean(pos['lat']), np.mean(pos['lon']))
+cs_ghi = loc.get_clearsky(ts.index, model='simplified_solis')['ghi']
+kt = ts.divide(cs_ghi, axis=0)
 
 # #######################
 # # FIND VARIABLE HOURS #
@@ -53,27 +60,25 @@ print(vs)
 # Now we'll compute the CMVs for each of those 20 hours.
 
 # Build a holder for the output data
-cmvs = pd.DataFrame(columns=["cld_spd", "cld_dir_rad", "df_p95", "ngood", "rval", "stderr", "error_index"])
+cmvs = pd.DataFrame(columns=["cld_spd", "cld_dir_rad", "df_p95", "ngood", "r_corr", "stderr_corr", "error_index", "flag"])
 cmvs_flags = []
 
 # Loop over hours
 for date in vs.index:
     # Select the subset of data
     hour = pd.date_range(date, date + pd.to_timedelta('1h'), freq='10s')
+    kt_hour = kt.loc[hour]
     hour = ts.loc[hour]
 
-    # Normalize it to yield something like kt (could actually calculate
-    # clearsky if available. Here, we're just using quantiles)
-    hourlymax = np.mean(hour.quantile(0.95))
-    kt = hour / hourlymax
+    hourlymax = kt_hour.quantile(0.95).mean()
 
     # Compute the CMV using the Jamaly method
-    cld_spd, cld_dir, dat = cmv.compute_cmv(kt, pos_utm, method='jamaly', options={'minvelocity': 1})
+    cld_spd, cld_dir, dat = cmv.compute_cmv(kt_hour, pos_utm, method='jamaly', options={'minvelocity': 1})
 
     # Store the global flag
     cmvs_flags.append(dat.flag)
 
-    cmvs.loc[date] = [cld_spd, cld_dir, hourlymax, dat.method_data['ngood'], dat.method_data['r_corr'], dat.method_data['stderr_corr'], np.abs(dat.method_data["error_index"])]
+    cmvs.loc[date] = [cld_spd, cld_dir, hourlymax, dat.method_data['ngood'], dat.method_data['r_corr'], dat.method_data['stderr_corr'], np.abs(dat.method_data["error_index"]), dat.flag.name]
 
 # Display the 20 CMVs we just acquired
 pd.options.display.max_columns = None
@@ -93,9 +98,9 @@ bad_inds = []
 for row in cmvs.itertuples():
     if row.ngood < ngood_min:
         bad_inds.append(row.Index)
-    elif row.rval < rval_min:
+    elif row.r_corr < rval_min:
         bad_inds.append(row.Index)
-    elif cmvs_flags[row.index(row.Index)] is not None:
+    elif cmvs_flags[row.index(row.Index)] is not cmv.Flag.GOOD:
         bad_inds.append(row.Index)
 
 # Drop the bad ones from the DF
