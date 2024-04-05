@@ -275,7 +275,7 @@ def remap_data(data, remap, columns=None):
     data_fix = data.copy()
     for item in remap:
         for column in columns:
-            data_fix[column][item[0]] = data[column][item[1]]
+            data_fix.loc[item[0], column] = data[column][item[1]]
     return data_fix
 
 
