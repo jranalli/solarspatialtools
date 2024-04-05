@@ -288,12 +288,10 @@ def averaged_tf(input_tsig, output_tsig,
                               nperseg=nperseg, detrend=detrend,
                               noverlap=noverlap)
 
-    # try:
-    tf = csdxy / psdxx
-    coh = np.abs(csdxy) ** 2 / (psdxx * psdyy)
-    # except ValueError:
-    #     tf = csdxy.T / np.expand_dims(psdxx, axis=1)
-    #     coh = np.abs(csdxy) ** 2 / (np.expand_dims(psdxx, axis=1) * psdyy)
+    # Calculating manually allows for vectorization and is faster
+    with np.errstate(divide='ignore', invalid='ignore'):
+        tf = csdxy / psdxx
+        coh = np.abs(csdxy) ** 2 / (psdxx * psdyy)
 
     # Calculate the coherence
     # _, coh = signal.coherence(input_tsig, output_tsig, fs=fs, window=window,
