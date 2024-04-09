@@ -60,7 +60,7 @@ print(str(remap_inds_r0) + '\n')
 # positions. So we'll run as follows.
 
 # Create a remapped version of the plant layout using the remapped indices
-pos_utm_r1 = field.remap_data(pos_utm, remap_inds_r0)
+pos_utm_r1 = field.remap_positions(pos_utm, remap_inds_r0)
 
 # Rerun the field calculation with the remapped positions
 preds_r1 = pd.DataFrame(index=refs, columns=['E', 'N'], dtype=float)
@@ -87,7 +87,7 @@ print(f"Has the remap stayed the same after recalculating? {remap_inds_r1 == rem
 # Since it hasn't yet converged, we'll go through it one more time
 
 # Update the plant layout again and recalculate again.
-pos_utm_r2 = field.remap_data(pos_utm, remap_inds_r1)
+pos_utm_r2 = field.remap_positions(pos_utm, remap_inds_r1)
 preds_r2 = pd.DataFrame(index=refs, columns=['E', 'N'], dtype=float)
 for ref in refs:
     pos, _ = field.compute_predicted_position([df_a, df_c], pos_utm_r2, ref,[cmv_a, cmv_c])
@@ -114,6 +114,7 @@ print(f"Has the remap stayed the same after recalculating? {remap_inds_r2 == rem
 # frame in the next
 
 for i, (init_pos, remap_pos, pred_pos, next_pred) in enumerate(zip([pos_utm, pos_utm_r1, pos_utm_r2], [pos_utm_r1, pos_utm_r2, pos_utm_r2], [preds_r0, preds_r1, preds_r2], [preds_r1, preds_r2, preds_r2])):
+    # Just creating some helper variables for the plot
     initial = pd.DataFrame({'E': init_pos['E'].loc[refs], 'N': init_pos['N'].loc[refs], 'E-delay': pred_pos['E'], 'N-delay': pred_pos['N']}, index=refs, dtype=float)
     reassigned = pd.DataFrame({'E': remap_pos['E'].loc[refs], 'N': remap_pos['N'].loc[refs], 'E-delay': pred_pos['E'], 'N-delay': pred_pos['N']}, index=refs, dtype=float)
     recalculated = pd.DataFrame({'E': remap_pos['E'].loc[refs], 'N': remap_pos['N'].loc[refs], 'E-delay': next_pred['E'], 'N-delay': next_pred['N']}, index=refs, dtype=float)

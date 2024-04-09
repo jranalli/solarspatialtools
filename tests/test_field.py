@@ -214,7 +214,7 @@ def test_assign_positions_reverse(position_data):
 
 
 def test_remap_data(position_data, remap_reverse):
-    data_out = field.remap_data(position_data, remap_reverse)
+    data_out = field.remap_positions(position_data, remap_reverse)
 
     assert isinstance(data_out, pd.DataFrame)
 

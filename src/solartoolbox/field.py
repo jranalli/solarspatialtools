@@ -235,7 +235,7 @@ def compute_delays(df, ref, navgs=5, coh_limit=0.6, freq_limit=0.02,
     return delay, coh
 
 
-def remap_data(data, remap, columns=None):
+def remap_positions(data, remap, columns=None):
     """
     Remaps the data based on the remap indices. Each tuple is a pair of
     entity names (indices), where the first index is the original location, and
@@ -449,6 +449,6 @@ def assign_positions(original_pos, predicted_pos):
 
     # Create a fixed copy of the data to reflect the remapping
     data_out = original_pos.copy()
-    data_out = remap_data(data_out, remap_indices)
+    data_out = remap_positions(data_out, remap_indices)
 
     return remap_indices, data_out
