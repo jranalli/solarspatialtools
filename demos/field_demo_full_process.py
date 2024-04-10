@@ -6,12 +6,11 @@ import matplotlib.pyplot as plt
 
 from solartoolbox import cmv, spatial, field
 
-def analyze(positions, cmvs, time_series):
-    pass
-
-
-def multiproc(ref):
-    pass
+try:
+    from tqdm import tqdm
+except ImportError:
+    def tqdm(x):
+        return x
 
 def main():
     datafile = "data/sample_plant_1.h5"
@@ -43,12 +42,12 @@ def main():
             cmv_pairs.remove(pair)
     print(cmv_pairs)
 
-    from tqdm import tqdm
-
     positions_initial = []
     positions_remapped = []
     predictions_initial = []
     predictions_recalc = []
+
+    remaps = []
 
     working = True
     remap = [(ref, ref) for ref in refs]
@@ -99,12 +98,16 @@ def main():
         positions_remapped.append(pos_upd.copy())
         pos_remap = pos_upd.copy()
 
-        if remap_new == remap or len(positions_remapped) >= 10:
+        # Check which combiners have changed
+        changed = [newmap[0] for newmap, oldmap in zip(remap_new, remap) if newmap != oldmap]
+        print(f"Changed: {len(changed)}")
+
+        if remap_new in remaps or len(positions_remapped) >= 10:
             working = False
+            remaps.append(remap_new)
         else:
-            changed = [p[0] for p,r in zip(remap_new, remap) if p != r]
-            print(f"Changed: {len(changed)}")
             remap = remap_new
+            remaps.append(remap)
 
     for i, (init_pos, remap_pos, pred_pos, next_pred) in enumerate(zip(positions_initial, positions_remapped, predictions_initial, predictions_initial[1:]+[predictions_initial[-1]])):
         # Just creating some helper variables for the plot
