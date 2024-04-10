@@ -98,7 +98,7 @@ def test_cmv_artificial(theta_deg, velocity, mode):
 
 def test_cmv_gagne_data():
     datafile = "../demos/data/sample_plant_1.h5"
-    pos_utm = pd.read_hdf(datafile, mode="r", key="latlon")
+    pos_utm = pd.read_hdf(datafile, mode="r", key="utm")
     df = pd.read_hdf(datafile, mode="r", key="data_a")
 
     hourlymax = np.mean(df.quantile(0.95))
@@ -116,7 +116,7 @@ def test_cmv_gagne_data():
 
 def test_cmv_jamaly_data():
     datafile = "../demos/data/sample_plant_1.h5"
-    pos_utm = pd.read_hdf(datafile, mode="r", key="latlon")
+    pos_utm = pd.read_hdf(datafile, mode="r", key="utm")
     df = pd.read_hdf(datafile, mode="r", key="data_a")
 
     hourlymax = np.mean(df.quantile(0.95))
@@ -134,7 +134,7 @@ def test_cmv_jamaly_data_ref():
     # A test using a reference when we calculate the CMV
 
     datafile = "../demos/data/sample_plant_1.h5"
-    pos_utm = pd.read_hdf(datafile, mode="r", key="latlon")
+    pos_utm = pd.read_hdf(datafile, mode="r", key="utm")
     df = pd.read_hdf(datafile, mode="r", key="data_a")
 
     hourlymax = np.mean(df.quantile(0.95))
@@ -149,3 +149,21 @@ def test_cmv_jamaly_data_ref():
     assert cld_spd_jam == approx(9.3911, abs=0.01)
     assert cld_dir_jam == approx(3.665955, abs=0.01)
     assert sum(dat_jam.pair_flag == cmv.Flag.GOOD) == 64
+
+
+def test_optimum_subset_base():
+    angles = np.linspace(0, np.pi, 9)
+    magnitudes = np.linspace(1, 6, 9)
+    vx = magnitudes * np.cos(angles)
+    vy = magnitudes * np.sin(angles)
+    indices = cmv.optimum_subset(vx, vy, n=4)
+    assert np.sort(np.rad2deg(angles[indices])) == approx(np.sort(np.array([0, 45, 90, 135])))
+
+
+def test_optimum_subset_rotate():
+    angles = np.linspace(0, np.pi, 9) + np.pi/4
+    magnitudes = np.linspace(1, 6, 9)
+    vx = magnitudes * np.cos(angles)
+    vy = magnitudes * np.sin(angles)
+    indices = cmv.optimum_subset(vx, vy, n=4)
+    assert np.sort(np.rad2deg(angles[indices])) == approx(np.sort(np.array([45, 90, 135, 180])))
