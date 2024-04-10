@@ -177,6 +177,8 @@ packages `cmv` and `field` will be the most broadly useful to the research
 community and have been the focus of additional testing, documentation and 
 tutorial development.
 
+See `Changelog.md` for more details.
+
 # Relationship with other packages
 This package is not meant to replace or compete with well established packages 
 like [pvlib](https://github.com/pvlib/pvlib-python) or

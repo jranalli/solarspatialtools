@@ -39,4 +39,18 @@ site itself.
 # Version 0.3.4
 - Bug fix for handling and excluding NaN within `field`
 # Version 0.3.5
-- Add multi-column support to several functions in `stats`. Thanks to Scott Sheppard for the suggestion. 
+- Add multi-column support to several functions in `stats`. Thanks to Scott Sheppard for the suggestion.
+# Version 0.4.0
+- Added some functions to `field` to support automated remapping.
+    - See `field_reassignment_demo` for details.
+- Added a function to `cmv` for identifying an optimum subset of CMV pairs. 
+    - See `automate_cmv_demo` for details.
+- Added additional statistics to the `jamaly` method's output within `cmv.compute_cmv`
+- Added additional sample plant data for demonstration purposes. 
+    - We now include two sample plants and sample data from the HOPE-Melpitz campaign at 1s and 10s resolution.
+- Added additional demos, including Jupyter notebooks in some cases.
+    - `automate_cmv_demo` - Automated CMV pre-processing with HOPE-Melpitz data, includes a Jupyter notebook.
+    - `field_reassignment_demo` - Automated remapping of the field data, includes a Jupyter notebook.
+    - `field_demo_full_process` - Overview of the full field processing workflow 
+    - `field_demo_full_process_multithread` - Same as previous but including multithreading support for speed
+- Added tests of these new functions for more completeness.
