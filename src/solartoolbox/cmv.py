@@ -295,7 +295,7 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
             r_corr = 0
             std_err = 0
         ngood = len(vectors_good)
-        method_out['r_corr'] = r_corr
+        method_out['r_corr'] = np.abs(r_corr)
         method_out['stderr_corr'] = std_err
         method_out['ngood'] = ngood
 

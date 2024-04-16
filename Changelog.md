@@ -54,3 +54,5 @@ site itself.
     - `field_demo_full_process` - Overview of the full field processing workflow 
     - `field_demo_full_process_multithread` - Same as previous but including multithreading support for speed
 - Added tests of these new functions for more completeness.
+# Version 0.4.1
+- Bug fix for `cmv` so that `jamaly` r_corr is always positive. 
