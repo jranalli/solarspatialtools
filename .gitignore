@@ -134,7 +134,7 @@ dmypy.json
 /demos/data/*
 
 # but inlcude the sample plant geojson file
-!/demos/data/digitized_plant*.geojson
+!/demos/data/digitized_plant*.*
 
 # IDE Files
 .idea*
