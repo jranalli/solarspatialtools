@@ -37,7 +37,7 @@ area that could use some expansion in the future.
 
 ```demos```  
 Data and demonstration codes (including as jupyter notebooks) that demonstrate 
-the functionality of the package. An explanation the included data is 
+the functionality of the package. An explanation for the included data is 
 warranted. 
 
 - Anonymized Plant Combiner Data  

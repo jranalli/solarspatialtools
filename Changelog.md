@@ -56,3 +56,4 @@ site itself.
 - Added tests of these new functions for more completeness.
 # Version 0.4.1
 - Bug fix for `cmv` so that `jamaly` r_corr is always positive. 
+- Demo for digitizing a plant equipment layout added by @williamhobbs
