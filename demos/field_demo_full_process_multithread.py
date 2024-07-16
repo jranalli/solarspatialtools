@@ -28,7 +28,7 @@ def main():
 
     datafile = "data/sample_plant_1.h5"
 
-    dfs = {}
+    ts_datas = {}
     cmvs = {}
 
     # Load the plant layout
@@ -42,15 +42,15 @@ def main():
     # following the methodological approach in automate_cmv_demo.py to determine
     # time periods when the CMV is likely to be useful.
     for key in ['a', 'b', 'c', 'd', 'e']:
-        dfs[key] = pd.read_hdf(datafile, mode="r", key=f"data_{key}").infer_objects()
+        ts_datas[key] = pd.read_hdf(datafile, mode="r", key=f"data_{key}").infer_objects()
 
     # ################
     # # COMPUTE CMVs #
     # ################
 
     # Calculate CMVs for each time window
-    for key in dfs.keys():
-        cld_spd, cld_dir, dat = cmv.compute_cmv(dfs[key], pos_utm, method='jamaly', options={'minvelocity': 1})
+    for key in ts_datas.keys():
+        cld_spd, cld_dir, dat = cmv.compute_cmv(ts_datas[key], pos_utm, method='jamaly', options={'minvelocity': 1})
         cmvs[key] = spatial.pol2rect(cld_spd, cld_dir)
     print(pd.DataFrame(cmvs.values(), index=cmvs.keys(), columns=['cld_x', 'cld_y']))
 
@@ -116,7 +116,7 @@ def main():
         # combiner, so we can just repeat them. The only true iteration
         # variable is cmb_id.
         for cmb_id, cmb_preds in pool.imap(multipool_helper,
-                                           [(cmb_id, pos_map, dfs, cmv_pairs, cmvs) for cmb_id in cmb_ids],
+                                           [(cmb_id, pos_map, ts_datas, cmv_pairs, cmvs) for cmb_id in cmb_ids],
                                            chunksize=chunksize):
             # Use the returned data from the helper function to update the
             # mean_preds object

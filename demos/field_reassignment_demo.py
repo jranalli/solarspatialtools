@@ -15,8 +15,8 @@ from solartoolbox import spatial, field
 
 # Load the data for Sample Plant 1 and specify the CMVs
 datafile = "data/sample_plant_1.h5"
-df_a = pd.read_hdf(datafile, mode="r", key="data_a").infer_objects()
-df_c = pd.read_hdf(datafile, mode="r", key="data_c").infer_objects()
+ts_data_a = pd.read_hdf(datafile, mode="r", key="data_a").infer_objects()
+ts_data_c = pd.read_hdf(datafile, mode="r", key="data_c").infer_objects()
 cmv_a = spatial.pol2rect(10.7, 3.29)
 cmv_c = spatial.pol2rect(3.14, 1.92)
 
@@ -41,7 +41,7 @@ refs = [nm for nm in pos_utm.index if nm.split('-')[1] in ['20']]
 # Perform the calculation for each combiner and store the results
 preds_r0 = pd.DataFrame(index=refs, columns=['E', 'N'], dtype=float)
 for ref in refs:
-    pos, _ = field.compute_predicted_position([df_a, df_c], pos_utm, ref,[cmv_a, cmv_c])
+    pos, _ = field.compute_predicted_position([ts_data_a, ts_data_c], pos_utm, ref, [cmv_a, cmv_c])
     preds_r0.loc[ref] = pos
 
 # field.assign_positions will return a list of tuples that can be used to
@@ -65,7 +65,7 @@ pos_utm_r1 = field.remap_positions(pos_utm, remap_inds_r0)
 # Rerun the field calculation with the remapped positions
 preds_r1 = pd.DataFrame(index=refs, columns=['E', 'N'], dtype=float)
 for ref in refs:
-    pos, _ = field.compute_predicted_position([df_a, df_c], pos_utm_r1, ref,[cmv_a, cmv_c])
+    pos, _ = field.compute_predicted_position([ts_data_a, ts_data_c], pos_utm_r1, ref, [cmv_a, cmv_c])
     preds_r1.loc[ref] = pos
 
 # Update the assignment of combiner positions based on this recalculation.
@@ -90,7 +90,7 @@ print(f"Has the remap stayed the same after recalculating? {remap_inds_r1 == rem
 pos_utm_r2 = field.remap_positions(pos_utm, remap_inds_r1)
 preds_r2 = pd.DataFrame(index=refs, columns=['E', 'N'], dtype=float)
 for ref in refs:
-    pos, _ = field.compute_predicted_position([df_a, df_c], pos_utm_r2, ref,[cmv_a, cmv_c])
+    pos, _ = field.compute_predicted_position([ts_data_a, ts_data_c], pos_utm_r2, ref, [cmv_a, cmv_c])
     preds_r2.loc[ref] = pos
 
 # Redo the assignment and redo the coordinate system cascade

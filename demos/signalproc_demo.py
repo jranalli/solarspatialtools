@@ -36,7 +36,7 @@ def main():
 
     # Read Data from HDF file
     pos = pd.read_hdf(fn, mode="r", key="latlon")
-    ts = pd.read_hdf(fn, mode="r", key="data")
+    ts_data = pd.read_hdf(fn, mode="r", key="data")
 
     # Project them to UTM
     pos_utm = spatial.latlon2utm(pos['lat'], pos['lon'])
@@ -46,7 +46,7 @@ def main():
 
     # Downselect the time series to just the points in the plant, and just
     # the time window of interest.
-    ts_sub = ts.loc[twin]
+    ts_sub = ts_data.loc[twin]
 
     # Select the Input (reference) time series, and compute the Output
     # (aggregate time series)

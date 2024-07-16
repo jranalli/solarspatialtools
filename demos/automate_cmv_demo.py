@@ -26,13 +26,13 @@ from solartoolbox import stats, spatial, cmv
 fn = 'data/hope_melpitz_10s.h5'
 pos = pd.read_hdf(fn, mode="r", key="latlon")
 pos_utm = spatial.latlon2utm(pos['lat'], pos['lon'])
-ts = pd.read_hdf(fn, mode="r", key="data")
+ts_data = pd.read_hdf(fn, mode="r", key="data")
 
 # We will need the clear sky index for the CMV calculation, so let's compute it
 # now.
 loc = pvlib.location.Location(np.mean(pos['lat']), np.mean(pos['lon']))
-cs_ghi = loc.get_clearsky(ts.index, model='simplified_solis')['ghi']
-kt = ts.divide(cs_ghi, axis=0)
+cs_ghi = loc.get_clearsky(ts_data.index, model='simplified_solis')['ghi']
+kt = ts_data.divide(cs_ghi, axis=0)
 
 # #######################
 # # FIND VARIABLE HOURS #
@@ -41,8 +41,8 @@ kt = ts.divide(cs_ghi, axis=0)
 # Compute the variability score for each hour. The formulation using lambda
 # allows it to be computed in a vectorized mode.
 avg_interval = '1h'
-vs = ts.resample(avg_interval).apply(
-                lambda x: stats.variability_score(x[ts.columns]))
+vs = ts_data.resample(avg_interval).apply(
+                lambda x: stats.variability_score(x[ts_data.columns]))
 
 # We want to select hours over the time series that are likely to produce good
 # CMVs, since CMV is computationally expensive. Compute the median of the
@@ -68,7 +68,7 @@ for date in vs.index:
     # Select the subset of data
     hour = pd.date_range(date, date + pd.to_timedelta('1h'), freq='10s')
     kt_hour = kt.loc[hour]
-    hour = ts.loc[hour]
+    hour = ts_data.loc[hour]
 
     hourlymax = kt_hour.quantile(0.95).mean()
 

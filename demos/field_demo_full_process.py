@@ -27,7 +27,7 @@ except ImportError:
 
 datafile = "data/sample_plant_1.h5"
 
-dfs = {}
+ts_datas = {}
 cmvs = {}
 
 # Load the plant layout
@@ -41,15 +41,15 @@ inv_ids.sort()
 # following the methodological approach in automate_cmv_demo.py to determine
 # time periods when the CMV is likely to be useful.
 for key in ['a', 'b', 'c', 'd', 'e']:
-    dfs[key] = pd.read_hdf(datafile, mode="r", key=f"data_{key}").infer_objects()
+    ts_datas[key] = pd.read_hdf(datafile, mode="r", key=f"data_{key}").infer_objects()
 
 # ################
 # # COMPUTE CMVs #
 # ################
 
 # Calculate CMVs for each time window
-for key in dfs.keys():
-    cld_spd, cld_dir, dat = cmv.compute_cmv(dfs[key], pos_utm, method='jamaly', options={'minvelocity': 1})
+for key in ts_datas.keys():
+    cld_spd, cld_dir, dat = cmv.compute_cmv(ts_datas[key], pos_utm, method='jamaly', options={'minvelocity': 1})
     cmvs[key] = spatial.pol2rect(cld_spd, cld_dir)
 print(pd.DataFrame(cmvs.values(), index=cmvs.keys(), columns=['cld_x', 'cld_y']))
 
@@ -112,7 +112,7 @@ while working:
             # In this loop, we compute the combiner position for an individual
             # pair of CMVs.
             cmb_pos, dat = field.compute_predicted_position(
-                [dfs[pair[0]], dfs[pair[1]]],
+                [ts_datas[pair[0]], ts_datas[pair[1]]],
                 pos_map, cmb_id, [cmvs[pair[0]], cmvs[pair[1]]])
 
             # Store this single CMV pair's prediction

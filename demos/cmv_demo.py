@@ -14,15 +14,15 @@ from solartoolbox import cmv, spatial
 # current time series from a utility scale PV plant.
 datafile = "data/sample_plant_2.h5"
 pos_utm = pd.read_hdf(datafile, mode="r", key="utm")
-df = pd.read_hdf(datafile, mode="r", key="data_a")
+ts_data = pd.read_hdf(datafile, mode="r", key="data_a")
 
 # The CMV routines in principle would work on non-normalized data, but have
 # some quality control parameters that are scaled to work with clearsky index.
 # So we'll normalize the current data to resemble clearsky index here. The
 # alternative would be to adjust the quality control parameters to work with
 # the scale of the raw data.
-hourlymax = np.mean(df.quantile(0.95))
-kt = df / hourlymax
+hourlymax = np.mean(ts_data.quantile(0.95))
+kt = ts_data / hourlymax
 
 # ################
 # # COMPUTE CMVs #

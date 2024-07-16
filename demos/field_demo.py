@@ -26,8 +26,8 @@ pos_utm = pd.read_hdf(datafile, mode="r", key="utm")
 # the time (with an arbitrary offset, so it begins at 00:00:00). The columns
 # are keyed by the combiner ID. df_a and df_b each represents a single hour of
 # data with a well defined CMV.
-df_a = pd.read_hdf(datafile, mode="r", key="data_a")
-df_b = pd.read_hdf(datafile, mode="r", key="data_b")
+ts_data_a = pd.read_hdf(datafile, mode="r", key="data_a")
+ts_data_b = pd.read_hdf(datafile, mode="r", key="data_b")
 
 
 # #############################
@@ -47,7 +47,7 @@ for ref in pos_utm.index[46:62]:
     # compute_predicted_position performs the entire calculation
     # it returns the expected aggregate position of the combiner (pos)
     pos, _ = field.compute_predicted_position(
-        [df_a, df_b],  # The dataframes with the two one hour periods
+        [ts_data_a, ts_data_b],  # The dataframes with the two one hour periods
         pos_utm,  # the dataframe specifying the combiner positions
         ref,  # the position within pos_utm to calculate about
         [cmv_a, cmv_b],  # The two individual CMVs for the DFs
