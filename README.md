@@ -126,7 +126,7 @@ motion.
 This is an open source project and appreciates participation, engagement and contribution from community members. Development on the library is active and the project seeks to provide a useful tool for the research community. The project is currently maintained by an individual researcher, and the process for contributions is not as formalized as it might be for larger projects.     
 
 If you've found a bug or have an idea for a new feature, please open an [issue](https://github.com/jranalli/solartoolbox/issues) 
-on GitHub. I'll do my best to respond.
+on GitHub. Questions can be asked in the GitHub [discussions](https://github.com/jranalli/solartoolbox/discussions).
 
 Code contributions are also welcome! Please follow the instructions in GitHub's [getting started guide](https://docs.github.com/en/get-started/start-your-journey/hello-world) to open a pull request. 
 
