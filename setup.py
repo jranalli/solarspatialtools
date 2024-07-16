@@ -19,9 +19,9 @@ setup(
     package_dir={"": "src"},
     packages=find_packages(where="src"),
     install_requires=[
+        'numpy<2',
         'pandas',
         'tables',  # possibly must be installed separately via conda pytables because of MS dependency
-        'numpy',
         'pyproj',
         'pvlib',
         'netcdf4',
