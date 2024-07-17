@@ -1,7 +1,5 @@
-solartoolbox.cmv module
------------------------
+Cloud Motion Vector Identification
+----------------------------------
 
 .. automodule:: solartoolbox.cmv
-   :members:
-   :undoc-members:
-   :show-inheritance:
+   :members: compute_cmv, optimum_subset
