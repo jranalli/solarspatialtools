@@ -27,17 +27,23 @@ def correlation(baseline, estimation, scaling='coeff'):
     estimation : numeric or pandas.Series
         The predicted signal
 
-    scaling : a string for the type scaling to use
-        Either 'energy', 'coeff', 'unbiased_energy', 'unbiased_coeff'
-        'energy' - scales by the energy of the autocorrelation of the input
-        'coeff' - scales the output to the correlation coefficient (always
-                  removes the mean from both signals)
-        'unbiased_energy' - similar to energy, but normalizes based on lag to
-                            account for the fewer points used in the
-                            convolution. Removes bias towards small lags.
-        'unbiased_coeff' - similar to coeff, but normalizes based on lag to
-                            account for the fewer points used in the
-                            convolution. Removes bias towards small lags.
+    scaling : str
+        a string for the type scaling to use.
+
+        Options are:
+            `energy`:
+                scales by the energy of the autocorrelation of the input
+            `coeff`:
+                scales the output to the correlation coefficient (always
+                removes the mean from both signals)
+            `unbiased_energy`:
+                similar to energy, but normalizes based on lag to account for
+                the fewer points used in the convolution. Removes bias towards
+                small lags.
+            `unbiased_coeff`:
+                similar to coeff, but normalizes based on lag to
+                account for the fewer points used in the
+                convolution. Removes bias towards small lags.
 
     Returns
     -------
@@ -375,8 +381,10 @@ def tf_delay(tf, coh, coh_limit=0.6, freq_limit=0.02, method='fit'):
         The frequency limit to use for filtering the phase. Set to None to
         include all points.
     method : str
-        The method to use for computing the delay. Options are:
-            'diff' - unwrap phase and take derivative (*not well validated)
+        The method to use for computing the delay.
+
+        Options are:
+            'diff' - unwrap phase and take derivative (not well validated)
             'fit' - fit a line to the phase
             'multi' - fit a line to the phase for multiple tfs at once
 
@@ -519,17 +527,22 @@ def xcorr_delay(ts_in, ts_out, scaling='coeff'):
     ts_out : pd.Series
         The output timeseries
     scaling : str
-        Type of scaling to use for cross correlation. Options are:
+        Type of scaling to use for cross correlation.
 
-        'energy' - scales by the energy of the autocorrelation of the input
-        'coeff' - scales the output to the correlation coefficient (always
-                  removes the mean from both signals)
-        'unbiased_energy' - similar to energy, but normalizes based on lag to
-                            account for the fewer points used in the
-                            convolution. Removes bias towards small lags.
-        'unbiased_coeff' - similar to coeff, but normalizes based on lag to
-                            account for the fewer points used in the
-                            convolution. Removes bias towards small lags.
+        Options are:
+            `energy`:
+                scales by the energy of the autocorrelation of the input
+            `coeff`:
+                scales the output to the correlation coefficient (always
+                removes the mean from both signals)
+            `unbiased_energy`:
+                similar to energy, but normalizes based on lag to account for
+                the fewer points used in the convolution. Removes bias towards
+                small lags.
+            `unbiased_coeff`:
+                similar to coeff, but normalizes based on lag to account for
+                the fewer points used in the convolution. Removes bias towards
+                small lags.
 
     Returns
     -------
@@ -558,16 +571,27 @@ def compute_delays(ts_in, ts_out, mode='loop', scaling='coeff'):
     Parameters
     ----------
     ts_in: pd.DataFrame
+        The time series representing the input signal
     ts_out: pd.DataFrame
+        The time series representing the output signal
     mode: str (default 'loop')
-        The method to use for computing the delay. Options are:
-            'loop' - loop over each input timeseries pair and compute the xcorr
-            'fft' - use the fft to compute the xcorr (seems to be slower)
+        The method to use for computing the delay.
+
+        Options are:
+            `loop`:
+                loop over each input timeseries pair and compute the xcorr
+            `fft`:
+                use the fft to compute the xcorr (seems to be slower)
+
     scaling: str (default 'coeff')
         Type of scaling to use for cross correlation. Note that debiased
-        scaling options are not available here. Valid options are:
-        'coeff' - computes the correlation coefficient
-        'none' - no scaling is applied
+        scaling options are not available here.
+
+        Valid options are:
+            `coeff`:
+                computes the correlation coefficient
+            `none`:
+                no scaling is applied
 
     Returns
     -------
@@ -577,9 +601,9 @@ def compute_delays(ts_in, ts_out, mode='loop', scaling='coeff'):
         as the max correlation values are limited to the discrete time steps.
     extra_data : dict{}
         Additional data about the correlations. Values are:
-            'peak_corr' - the peak value of the correlation for each input ts
-            'mean_corr' - the mean correlation for each input timeseries
-            'zero_corr' - the correlation at zero_lag for each input timeseries
+        'peak_corr' - the peak value of the correlation for each input ts
+        'mean_corr' - the mean correlation for each input timeseries
+        'zero_corr' - the correlation at zero_lag for each input timeseries
     """
     lags = signal.correlation_lags(len(ts_in), len(ts_in))
     dt = (ts_in.index[1] - ts_in.index[0]).total_seconds()

@@ -1,3 +1,5 @@
+.. _cmv-examples:
+
 CMV Examples
 ------------
 
@@ -6,6 +8,8 @@ CMV Examples
 
    demos/cmv_demo
    demos/automate_cmv_demo
+
+.. _field-examples:
 
 Field Analysis Examples
 -----------------------

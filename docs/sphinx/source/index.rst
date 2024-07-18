@@ -28,7 +28,7 @@ documentation for details.
 
    cmv
    field
-   api
+   othermods
 
 .. toctree::
    :maxdepth: 2
