@@ -18,9 +18,19 @@ The package can be most easily installed via `PyPi <https://pypi.org/project/sol
 
 
 
-Add your content using ``reStructuredText`` syntax. See the
-`reStructuredText <https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html>`_
-documentation for details.
+Getting Started
+---------------
+The functions in this package likely to be of general interest to the research community are those in the modules :mod:`solartoolbox.cmv` and :mod:`solartoolbox.field`.
+
+The :mod:`solartoolbox.cmv` module contains functions for calculating the cloud motion vector from a distributed network of irradiance measurements.
+
+The :mod:`solartoolbox.field` module contains functions for validating the layout of a PV plant or measurement network by calculating the relative delays between each sensor in the network subject to cloud motion.
+
+The best starting point is to read through the :ref:`cmv-examples` and :ref:`field-examples` sections to see some sample Jupyter notebooks that demonstrate how these functions can be used in practice.
+
+
+Contents
+--------
 
 .. toctree::
    :maxdepth: 1

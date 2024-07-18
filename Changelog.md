@@ -58,3 +58,4 @@ site itself.
 - Bug fix for `cmv` so that `jamaly` r_corr is always positive. 
 - Demo for digitizing a plant equipment layout added by @williamhobbs
 - Improve comments in `cmv_demo`
+- Add sphinx documentation for entire library
