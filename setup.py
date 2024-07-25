@@ -28,5 +28,5 @@ setup(
         'scipy'
     ],
     license='BSD (3 Clause)',
-    extras_require=dict(tests=['pytest'], demos=['matplotlib', 'jupyter'], docs=['sphinx', 'nbsphinx', 'sphinx_rtd_theme']),
+    extras_require=dict(tests=['pytest'], demos=['matplotlib', 'jupyter'], docs=['sphinx', 'nbsphinx', 'sphinx_rtd_theme', 'ipython']),
 )
