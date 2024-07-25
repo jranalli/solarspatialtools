@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-from solartoolbox import spatial, field
+from solarspatialtools import spatial, field
 
 # #############
 # # READ DATA #

@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pvlib
 
-from solartoolbox import stats, spatial, cmv
+from solarspatialtools import stats, spatial, cmv
 
 # This is a demo of automatically detecting CMVs within a time series and
 # filtering to high variability periods with diverse cloud motion directions.

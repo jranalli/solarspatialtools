@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-from solartoolbox import cmv, spatial, field
+from solarspatialtools import cmv, spatial, field
 
 # If tqdm is installed, use it to communicate the progress of the loop
 try:

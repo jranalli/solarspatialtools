@@ -6,7 +6,7 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'solartoolbox'
+project = 'solarspatialtools'
 copyright = '2024, Joe Ranalli'
 author = 'Joe Ranalli'
 

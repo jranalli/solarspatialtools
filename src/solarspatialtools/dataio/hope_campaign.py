@@ -3,8 +3,8 @@ import argparse
 import pandas as pd
 import numpy as np
 import netCDF4
-from solartoolbox.dataio.iotools import ensurepath, getfiles
-from solartoolbox.dataio.iotools import download, wget_fromurl
+from solarspatialtools.dataio.iotools import ensurepath, getfiles
+from solarspatialtools.dataio.iotools import download, wget_fromurl
 
 """
 Tool for downloading all of the HOPE and HOPE-Melpitz data from the University

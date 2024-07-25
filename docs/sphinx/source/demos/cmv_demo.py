@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-from solartoolbox import cmv, spatial
+from solarspatialtools import cmv, spatial
 
 # #############
 # # READ DATA #

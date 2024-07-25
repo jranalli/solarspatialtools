@@ -7,11 +7,11 @@ ver = '0.4.1'
 
 
 setup(
-    name='solartoolbox',
+    name='solarspatialtools',
     version=ver,
     author="Joe Ranalli",
     author_email="jranalli@psu.edu",
-    description="A research toolbox for solar analysis",
+    description="Spatial analysis tools for solar energy research",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/jranalli/solartoolbox",

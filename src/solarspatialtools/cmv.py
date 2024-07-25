@@ -1,9 +1,9 @@
 import numpy as np
 from scipy.optimize import minimize_scalar, leastsq
 
-from solartoolbox.signalproc import compute_delays
-from solartoolbox.spatial import project_vectors, compute_vectors
-from solartoolbox.spatial import pol2rect, magnitude, dot
+from solarspatialtools.signalproc import compute_delays
+from solarspatialtools.spatial import project_vectors, compute_vectors
+from solarspatialtools.spatial import pol2rect, magnitude, dot
 
 from scipy.optimize import linear_sum_assignment, shgo
 from scipy.stats import linregress

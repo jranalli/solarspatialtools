@@ -3,7 +3,7 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from solartoolbox import spatial, cmv, signalproc
+from solarspatialtools import spatial, cmv, signalproc
 from scipy.optimize import linear_sum_assignment
 
 warnings.filterwarnings("ignore",
@@ -44,13 +44,13 @@ def compute_predicted_position(dfs, pos_utm, ref, cld_vecs=None,
     navgs : int
         The number of averages to use when computing the transfer function.
         Affects both the coherence and the frequency resolution. Default is 5.
-        see solartoolbox.signalproc.averaged_tf for more information.
+        see solarspatialtools.signalproc.averaged_tf for more information.
     coh_limit : float
         The minimum coherence required for computing the delay. Default is 0.6.
-        See solartoolbox.signalproc.tf_delay for more information.
+        See solarspatialtools.signalproc.tf_delay for more information.
     freq_limit : float
         The maximum frequency that will be used when computing the delay.
-        See solartoolbox.signalproc.tf_delay for more info.
+        See solarspatialtools.signalproc.tf_delay for more info.
     delay_method : str
         The method for computing the delay. Options are 'fit' and 'multi'.
 
@@ -185,13 +185,13 @@ def compute_delays(df, ref, navgs=5, coh_limit=0.6, freq_limit=0.02,
     navgs : int
         The number of averages to use when computing the transfer function.
         Affects both the coherence and the frequency resolution. Default is 5.
-        see solartoolbox.signalproc.averaged_tf for more information.
+        see solarspatialtools.signalproc.averaged_tf for more information.
     coh_limit : float
         The minimum coherence required for computing the delay. Default is 0.6.
-        See solartoolbox.signalproc.tf_delay for more information.
+        See solarspatialtools.signalproc.tf_delay for more information.
     freq_limit : float
         The maximum frequency that will be used when computing the delay.
-        Default is 0.02. See solartoolbox.signalproc.tf_delay for more info.
+        Default is 0.02. See solarspatialtools.signalproc.tf_delay for more info.
     method : str
         The method for computing the delay. Options are 'fit' and 'multi'.
 

@@ -5,7 +5,7 @@ signalproc module
 -----------------
 This module contains functions for performing common digital signal processing tasks. Many are utilized by other modules within the package. In the context of the cmv and field modules, these functions are used primarily to calculate relationships between signals, specifically relative delays.
 
-.. automodule:: solartoolbox.signalproc
+.. automodule:: solarspatialtools.signalproc
 
     .. rubric:: Signal Processing Functions
 
@@ -25,7 +25,7 @@ This module contains functions for performing common digital signal processing t
 spatial module
 --------------
 
-.. automodule:: solartoolbox.spatial
+.. automodule:: solarspatialtools.spatial
 
     .. rubric:: Coordinates and Vector Projections
 
@@ -57,7 +57,7 @@ spatial module
 stats module
 ------------
 
-.. automodule:: solartoolbox.stats
+.. automodule:: solarspatialtools.stats
 
     .. rubric:: Variability Metrics
 
@@ -90,7 +90,7 @@ irradiance module
 -----------------
 This module solely serves as a helper, wrapping the `pvlib` function `pvlib.irradiance.clearsky_index`, which doesn't natively handle some of the data types used by this package.
 
-.. automodule:: solartoolbox.irradiance
+.. automodule:: solarspatialtools.irradiance
 
     .. rubric:: Functions
 

@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pvlib.location
 
-from solartoolbox import spatial, signalproc, stats
+from solarspatialtools import spatial, signalproc, stats
 
 
 """
