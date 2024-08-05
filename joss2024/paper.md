@@ -1,5 +1,5 @@
 ---
-title: 'solartoolbox: A Python package for spatial solar energy analyses'
+title: 'SolarSpatialTools: A Python package for spatial solar energy analyses'
 tags:
   - Python
   - solar energy
@@ -26,17 +26,17 @@ bibliography: paper.bib
 
 # Summary
 
-Solar energy is a form of renewable energy whose resource (i.e. sunlight) is available for capture on the earth's surface with a fixed energy density. This type of resource inherently requires spatial distribution of collection infrastructure in order to achieve increased generation scale. This is true both in the case of distributed (e.g. rooftop solar) and centralized generation. As international responses to climate change promote growing interest in solar energy, there is a corresponding growth of interest in tools for working with distributed solar energy data that possesses these characteristics. This package, `solartoolbox` aims to contribute to that need by providing research codes for spatial analyses of solar energy data and resources. 
+Solar energy is a form of renewable energy whose resource (i.e. sunlight) is available for capture on the earth's surface with a fixed energy density. This type of resource inherently requires spatial distribution of collection infrastructure in order to achieve increased generation scale. This is true both in the case of distributed (e.g. rooftop solar) and centralized generation. As international responses to climate change promote growing interest in solar energy, there is a corresponding growth of interest in tools for working with distributed solar energy data that possesses these characteristics. This package, `SolarSpatialTools` aims to contribute to that need by providing research codes for spatial analyses of solar energy data and resources. 
 
 # Statement of need
 
-As mature packages already exist for supporting general analysis and modeling of solar energy systems, such as `pvlib-python` [@anderson_pvlib_2023] and `pvanalytics` [@perry_pvanalytics_2022], this package is not intended to serve as a replacement, a competitor or to fragment those communities. Rather, `solartoolbox` serves to collect codes for several tasks that are out-of-scope for `pvlib-python` and `pvanalytics`, but are still of general interest to the research community. Where appropriate, capabilities of `solartoolbox` are contributed to `pvlib-python` or `pvanalytics`. For example, a python language port of the Wavelet Variability Model [@lave_cloud_2013] contained in the MATLAB `pvlib` package [@andrews_introduction_2014] was first developed within `solartoolbox` but was contributed to `pvlib-python` in 2019. `solartoolbox` primarily grew out of personal research codes developed by the lead author, but as tools have reached a level of maturity that attracted interest of a broader audience, it has been prepared as a package for more general public use.
+As mature packages already exist for supporting general analysis and modeling of solar energy systems, such as `pvlib-python` [@anderson_pvlib_2023] and `pvanalytics` [@perry_pvanalytics_2022], this package is not intended to serve as a replacement, a competitor or to fragment those communities. Rather, `SolarSpatialTools` serves to collect codes for several tasks that are out-of-scope for `pvlib-python` and `pvanalytics`, but are still of general interest to the research community. Where appropriate, capabilities of `SolarSpatialTools` are contributed to `pvlib-python` or `pvanalytics`. For example, a python language port of the Wavelet Variability Model [@lave_cloud_2013] contained in the MATLAB `pvlib` package [@andrews_introduction_2014] was first developed within `SolarSpatialTools` but was contributed to `pvlib-python` in 2019. `SolarSpatialTools` primarily grew out of personal research codes developed by the lead author under the name `solartoolbox`, but as tools have reached a level of maturity that attracted interest of a broader audience, it has been prepared as a package for more general public use.
 
-To be more specific, a variety of analytical techniques related to solar energy are documented in literature, but are not already implemented by existing packages in part due to their relatively high complexity relative to the those packages' intended scope. For example, techniques for processing cloud motion vectors (CMVs) from spatially distributed data sets are documented in the literature, such as the method by Jamaly and Kleissl [@jamaly_robust_2018] and that by Gagne et al. [@gagne_directional_2018]. Implementation of these techniques is laborious, requiring calculation of mutual correlation between all possible sensor pairs within a distributed data set. This fundamentally leads to a need to handle data types (i.e. simultaneous time series for each sensor) that are not aligned with the primary focus of the existing packages. Further, the number of calculation steps that are specialized for these CMV calculations makes them unattractive for inclusion in existing solar energy packages, without leading to an extreme broadening of scope to adapt to this singular use case. At the same time, the level of detail in those calculation steps makes them potentially difficult for other investigators to individually implement on a consistent and optimized basis. As they serve a common need within solar energy research, they are implemented in a well documented way by `solartoolbox` to help alleviate this challenge.
+To be more specific, a variety of analytical techniques related to solar energy are documented in literature, but are not already implemented by existing packages in part due to their relatively high complexity relative to the those packages' intended scope. For example, techniques for processing cloud motion vectors (CMVs) from spatially distributed data sets are documented in the literature, such as the method by Jamaly and Kleissl [@jamaly_robust_2018] and that by Gagne et al. [@gagne_directional_2018]. Implementation of these techniques is laborious, requiring calculation of mutual correlation between all possible sensor pairs within a distributed data set. This fundamentally leads to a need to handle data types (i.e. simultaneous time series for each sensor) that are not aligned with the primary focus of the existing packages. Further, the number of calculation steps that are specialized for these CMV calculations makes them unattractive for inclusion in existing solar energy packages, without leading to an extreme broadening of scope to adapt to this singular use case. At the same time, the level of detail in those calculation steps makes them potentially difficult for other investigators to individually implement on a consistent and optimized basis. As they serve a common need within solar energy research, they are implemented in a well documented way by `SolarSpatialTools` to help alleviate this challenge.
 
 # Features
 
-There are three capabilities of the `solartoolbox` package that are most likely to be of interest for a general audience. These main capabilities are contained in the following packages:
+There are three capabilities of the `SolarSpatialTools` package that are most likely to be of interest for a general audience. These main capabilities are contained in the following packages:
 - `signalproc`: tools for performing signal processing analyses across multi-sensor networks of solar energy data
 - `cmv`: tools for computing the cloud motion vector from spatially distributed sensor networks 
 - `field`: tools for analyzing the relative positions of spatially distributed measurement units via cloud motion
@@ -58,7 +58,7 @@ The `demos` directory includes a variety of demonstration codes and explanatory 
 
 ## Additional Packages
 
-The remaining packages in `solartoolbox` are somewhat less likely to be of general interest, but serve either a specialized or supporting purpose to the primary functionality:
+The remaining packages in `SolarSpatialTools` are somewhat less likely to be of general interest, but serve either a specialized or supporting purpose to the primary functionality:
 - `dataio`: prewritten functions for downloading and preprocessing distributed solar irradiance data specifically from the HOPE [@macke_hdcp2_2017] and NRCAN [@pelland_spatiotemporal_2021] measurement campaigns.
 - `irradiance`: a wrapper for `pvlib-python.clearsky_index` for easier processing of multiple simultaneous timeseries.
 - `spatial`: tools for performing vector and geographic projection operations necessary for other packages.
@@ -66,6 +66,6 @@ The remaining packages in `solartoolbox` are somewhat less likely to be of gener
 
 # Acknowledgements
 
-Work on solartoolbox was funded by Penn State Hazleton and Penn State School of Engineering Design and Innovation.
+Work on SolarSpatialTools was funded by Penn State Hazleton and Penn State School of Engineering Design and Innovation.
 
 # References
