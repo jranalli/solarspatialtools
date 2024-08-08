@@ -129,6 +129,8 @@ of each hour of the day over a 30 day window)
 ```field```
 Functions for predicting the position of field components on the basis of cloud
 motion. 
+- [Ranalli and Hobbs (2024)](https://doi.org/10.1109/JPHOTOV.2024.3366666)
+- Ranalli and Hobbs (2024, IEEE PVSC, forthcoming)
 
 
 # Contributing
