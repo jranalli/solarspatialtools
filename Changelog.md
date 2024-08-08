@@ -61,3 +61,7 @@ site itself.
 - Add sphinx documentation for entire library
 # Version 0.4.2
 - Rename the library to solarspatialtools
+# Version 0.4.3 & 0.4.4
+- Fixes to GitHub deployment issues, no functional changes
+# Version 0.4.5
+- 

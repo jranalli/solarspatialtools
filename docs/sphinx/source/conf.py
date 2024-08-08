@@ -11,7 +11,7 @@ copyright = '2024, Joe Ranalli'
 author = 'Joe Ranalli'
 
 release = '0.4'
-version = '0.4.4'
+version = '0.4.5'
 
 import os
 import sys
