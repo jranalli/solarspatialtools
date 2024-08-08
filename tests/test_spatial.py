@@ -3,7 +3,7 @@ from pytest import approx, fixture, raises
 import numpy as np
 import pandas as pd
 
-from solartoolbox import spatial
+from solarspatialtools import spatial
 
 
 @fixture

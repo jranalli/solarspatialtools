@@ -4,7 +4,7 @@ from pytest import approx
 import numpy as np
 import pandas as pd
 
-from solartoolbox import field, spatial
+from solarspatialtools import field, spatial
 
 
 @pytest.fixture(params=['coherence', 'global_coherence', 'distance', 'all'])

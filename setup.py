@@ -7,15 +7,15 @@ ver = '0.4.1'
 
 
 setup(
-    name='solartoolbox',
+    name='solarspatialtools',
     version=ver,
     author="Joe Ranalli",
     author_email="jranalli@psu.edu",
-    description="A research toolbox for solar analysis",
+    description="Spatial analysis tools for solar energy research",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/jranalli/solartoolbox",
-    download_url="https://github.com/jranalli/solartoolbox/archive/{}.tar.gz".format(ver),
+    download_url="https://github.com/jranalli/solarspatialtools/archive/{}.tar.gz".format(ver),
     package_dir={"": "src"},
     packages=find_packages(where="src"),
     install_requires=[
@@ -28,5 +28,5 @@ setup(
         'scipy'
     ],
     license='BSD (3 Clause)',
-    extras_require=dict(tests=['pytest'], demos=['matplotlib', 'jupyter'], docs=['sphinx', 'nbsphinx', 'sphinx_rtd_theme']),
+    extras_require=dict(tests=['pytest'], demos=['matplotlib', 'jupyter'], docs=['sphinx', 'nbsphinx', 'sphinx_rtd_theme', 'ipython']),
 )

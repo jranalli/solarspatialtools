@@ -4,7 +4,7 @@ import numpy as np
 from numpy.testing import assert_allclose
 import pandas as pd
 
-from solartoolbox import clearsky_index
+from solarspatialtools import clearsky_index
 
 
 def test_clearsky_index():

@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-from solartoolbox import cmv, spatial, field
+from solarspatialtools import cmv, spatial, field
 
 # This demonstration is identical to field_demo_full_process.py with the
 # exception that it uses the multiprocessing module to parallelize the

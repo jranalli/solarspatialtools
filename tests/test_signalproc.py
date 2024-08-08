@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from scipy import signal
 from scipy.interpolate import interp1d
-from solartoolbox.signalproc import averaged_psd, averaged_tf, interp_tf, tf_delay, xcorr_delay, apply_delay, correlation, compute_delays, _fftcorrelate
+from solarspatialtools.signalproc import averaged_psd, averaged_tf, interp_tf, tf_delay, xcorr_delay, apply_delay, correlation, compute_delays, _fftcorrelate
 
 
 @pytest.fixture(params=[0, 0.2, -0.2, 0.4, -0.4, 1, -1])

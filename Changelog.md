@@ -59,3 +59,5 @@ site itself.
 - Demo for digitizing a plant equipment layout added by @williamhobbs
 - Improve comments in `cmv_demo`
 - Add sphinx documentation for entire library
+# Version 0.4.2
+- Rename the library to solarspatialtools

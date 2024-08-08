@@ -4,7 +4,7 @@ from pytest import approx
 import numpy as np
 import pandas as pd
 
-from solartoolbox import cmv
+from solarspatialtools import cmv
 
 
 @pytest.fixture(params=[0, 45, 60, -60, 90, 124.5, 340.5])

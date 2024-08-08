@@ -1,9 +1,9 @@
-.. currentmodule:: solartoolbox
+.. currentmodule:: solarspatialtools
 
 Plant Field Validation
 ----------------------
 
-The `field` module contains functions for validating the positions of solar panels in a plant field. It relies on knowledge of the cloud motion vector (see :mod:`solartoolbox.cmv`) and several signal processing routines in :mod:`solartoolbox.signalproc`. Full details of the methodology are available in reference papers [1, 2].
+The `field` module contains functions for validating the positions of solar panels in a plant field. It relies on knowledge of the cloud motion vector (see :mod:`solarspatialtools.cmv`) and several signal processing routines in :mod:`solarspatialtools.signalproc`. Full details of the methodology are available in reference papers [1, 2].
 
 For example usages, see the :ref:`field-examples` page, specifically `field_demo`, `field_demo_detailed` and `field_reassignment_demo`. Examples of the full workflow are available in python files in the `demos` directory, `field_demo_full_process.py` and `field_demo_full_process_multithread.py`.
 
@@ -11,7 +11,7 @@ For example usages, see the :ref:`field-examples` page, specifically `field_demo
 
 [2] J. Ranalli and W.B. Hobbs, “Automating Methods for Validating PV Plant Equipment Labels,” 52nd IEEE PV Specialists Conference, 2024.
 
-.. automodule:: solartoolbox.field
+.. automodule:: solarspatialtools.field
 
 
     .. rubric:: Functions
