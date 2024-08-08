@@ -112,10 +112,12 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
                 options=None):
     """
     Find Cloud Motion Vector based on clear sky index timeseries from a cluster
-    of sensors using the method by Jamaly and Kleissl [1]. An alternate method
+    of sensors.
+
+    Default uses the method by Jamaly and Kleissl [1]. An alternate method
     described by Gagne [2] is available. Optionally computes relative
     to a single reference point rather than a global computation across all
-    possible site pairs
+    possible site pairs.
 
     Parameters
     ----------
@@ -132,9 +134,9 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
 
     reference_id : numeric, str, iterable, or None (default None)
         The identifier of a single reference site id within the dataframe.
-          OR
+        OR
         a list/tuple of identifiers of references within the dataframe.
-          OR
+        OR
         None to signify that all possible site pairs should be considered.
 
     method : str (default 'jamaly')
@@ -142,11 +144,20 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
 
     options : dict (default {})
         Dictionary of detailed QC arguments for the methods.
+            All Methods:
+                ktlim : float (default 0.4)
+                    Minimum permissible clear sky index for time period
             Jamaly:
                 minvelocity : float (default 0 m/s)
                     Minimum permissible pairwise velocity in m/s
                 maxvelocity : float (default 70 m/s)
                     Maximum permissible pairwise velocity in m/s
+                var_s_lim : float (default 0.05)
+                    Minimum permissible pairwise variation ratio in signals
+                mincorr : float (default 0.8)
+                    Minimum permissible correlation coefficient for site pairs
+            Gagne:
+                No method specific options
 
     Returns
     -------
@@ -295,7 +306,7 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
             r_corr = 0
             std_err = 0
         ngood = len(vectors_good)
-        method_out['r_corr'] = r_corr
+        method_out['r_corr'] = np.abs(r_corr)
         method_out['stderr_corr'] = std_err
         method_out['ngood'] = ngood
 

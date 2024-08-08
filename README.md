@@ -1,9 +1,11 @@
 # SolarToolbox
-`solartoolbox` is a package containing tools for dealing with analysis of solar 
-energy data. Its specific focus is on signal processing approaches and 
-addressing variability from a spatiotemporal perspective. Tools here might be 
-useful for dealing with distributed data sets, or performing analyses that 
-rely on a spatially distributed set of measurements.
+Spatial analysis tools for solar energy research
+
+`solartoolbox` is a python package containing implementations of various spatial algorithms for solar energy data. While excellent open source solar energy packages already exist (e.g. [pvlib-python](https://github.com/pvlib/pvlib-python) and [pvanalytics](https://github.com/pvlib/pvanalytics)), the complexity of some high-level analyses found in the academic literature makes them as a poor fit for the scope of existing packages. This package fills that gap by implementing techniques that we hope can facilitate common spatial tasks for solar energy researchers and provide a platform for consistency and efficiency improvements in these calculations. 
+
+Two examples of what are believed to be the most generally useful techniques this package implements are:
+- Processing the cloud motion vector from a distributed sensor network. 
+- Verifying the locations of field components (e.g. combiners) within a distributed network of measurements
 
 # Installation
 The package can be most easily installed via [PyPi](https://pypi.org/project/solartoolbox/) 
@@ -11,6 +13,18 @@ with the following command:
 ```bash
 pip install solartoolbox
 ```
+
+# Getting Started
+A number of example codes are available in the demos folder. These are meant to demonstrate what are believed to be the most useful functions in the package and applications of the functions to real sample data included with the library.
+
+
+# Common Data Formatting
+
+The algorithm implementations in this package primarily involve spatially distributed analyses of solar energy data, necessitating processing of multiple simultaneous time series. Most codes will assume that data is provided using a common format, based upon ```pandas``` DataFrame objects. The demo codes use the following convention for the two most important data variables. 
+- ```pos``` or ```pos_utm``` - Data for the location of each sensor should be stored in a DataFrame with the sensor id as the index and the latitude and longitude (or UTM coordinates) as columns. 
+- ```ts_data``` - Sensor time series data should be stored in a DataFrame with the timestamp as the index and the sensor id as the columns. 
+The index of ```pos``` needs to match the columns of ```ts_data``` so that the correspondence between the locations and the time series can be maintained.
+
 
 # Structure of the Library
 The codes are organized into a few subpackages and several function libraries.
@@ -37,7 +51,7 @@ area that could use some expansion in the future.
 
 ```demos```  
 Data and demonstration codes (including as jupyter notebooks) that demonstrate 
-the functionality of the package. An explanation the included data is 
+the functionality of the package. An explanation for the included data is 
 warranted. 
 
 - Anonymized Plant Combiner Data  
@@ -107,56 +121,19 @@ of each hour of the day over a 30 day window)
 Functions for predicting the position of field components on the basis of cloud
 motion. 
 
-## Common format for H5 files used for Data Storage
-
-I've tried to format the multisite time series measurements in a way that's 
-conveinent for loading the files and working with the data. This came about 
-from my initial work analyzing the HOPE Campaign, which used 100 individual 
-point measurements of GHI scattered through a region near Jülich, Germany.
-
-All data is collected into a single H5 file containing multiple fields. I use
-```pandas``` and specifically ```pandas.read_hdf()``` for getting the data
-into python. 
-
-- ```latlon```: The latitude/longitude of the individual measurement sites
-- ```utm```: The UTM coordinates of the individual measurement sites
-- ```data```: Global Horizontal Irradiance
-- ```data_tilt```: Global Tilted Irradiance (if available)
-
-#### Location Data
-Data about the location of each individual site is stored in the H5 file. Two
-possible keys are used depending on the projection. Both are available when 
-possible. The key ```latlon``` represents the site in a latitude coordinate
-system. The key ```utm``` will contain the positions using UTM (or similar) 
-projection that attempts to place the layout into a rectilinear coordinates. 
-Upon use of ```pandas.read_hdf()``` the data will be brought into a DataFrame 
-object.
-
-- The index of the DataFrame is the site id. The HOPE datasets use an integer 
-for the id, while NRCAN uses a string. 
-- Columns are labelled ```lat``` and ```lon``` and contain the lat and lon in 
-degrees for each of the distributed sensors (or ```E```, ```N``` in the case of 
-```utm```).
-
-#### Irradiance Data
-Measurements consist of the individual sensor time series with a shared time 
-index. Upon use of ```pandas.read_hdf()``` the data will be brought into a 
-DataFrame object. Each individual sensor has its own column. 
-
-- Index of the DataFrame is the timestamp referenced to a timezone
-- Columns contain the time series for each individual sensor, and are keyed by
-the site id (HOPE - integer, NRCAN - string).
 
 # Contributing
-This project is happy to accept contributions and hear from users. The best way 
-to interact right now is to open an [issue](https://github.com/jranalli/solartoolbox/issues) 
-on GitHub. This is the best way to ask a question, make a suggestion about a 
-feature or describe a bug that you've encountered. 
+This is an open source project and appreciates participation, engagement and contribution from community members. Development on the library is active and the project seeks to provide a useful tool for the research community. The project is currently maintained by an individual researcher, and the process for contributions is not as formalized as it might be for larger projects.     
+
+If you've found a bug or have an idea for a new feature, please open an [issue](https://github.com/jranalli/solartoolbox/issues) 
+on GitHub. Questions can be asked in the GitHub [discussions](https://github.com/jranalli/solartoolbox/discussions).
+
+Code contributions are also welcome! Please follow the instructions in GitHub's [getting started guide](https://docs.github.com/en/get-started/start-your-journey/hello-world) to open a pull request. 
+
+Changes to the contribution guidelines and policies may be made in the future in response to growth of the project and community.
 
 # License
-This project is licensed under the BSD 3-Clause License - see the 
-[LICENSE](https://github.com/jranalli/solartoolbox/blob/main/LICENSE) file
-for full details. 
+This project is licensed under the BSD 3-Clause License - see the [LICENSE](https://github.com/jranalli/solartoolbox/blob/main/LICENSE) file for full details. 
 
 # History
 Solartoolbox began as a library of tools developed to support my own research 

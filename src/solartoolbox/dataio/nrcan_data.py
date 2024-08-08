@@ -58,6 +58,48 @@ target_file - the full path name of the output h5 file
 
 See the bottom of the file for an example of usage
 
+
+
+## Common format for H5 files used for Data Storage
+
+I've tried to format the multisite time series measurements in a way that's 
+conveinent for loading the files and working with the data. This came about 
+from my initial work analyzing the HOPE Campaign, which used 100 individual 
+point measurements of GHI scattered through a region near Jülich, Germany.
+
+All data is collected into a single H5 file containing multiple fields. I use
+```pandas``` and specifically ```pandas.read_hdf()``` for getting the data
+into python. 
+
+- ```latlon```: The latitude/longitude of the individual measurement sites
+- ```utm```: The UTM coordinates of the individual measurement sites
+- ```data```: Global Horizontal Irradiance
+- ```data_tilt```: Global Tilted Irradiance (if available)
+
+#### Location Data
+Data about the location of each individual site is stored in the H5 file. Two
+possible keys are used depending on the projection. Both are available when 
+possible. The key ```latlon``` represents the site in a latitude coordinate
+system. The key ```utm``` will contain the positions using UTM (or similar) 
+projection that attempts to place the layout into a rectilinear coordinates. 
+Upon use of ```pandas.read_hdf()``` the data will be brought into a DataFrame 
+object.
+
+- The index of the DataFrame is the site id. The HOPE datasets use an integer 
+for the id, while NRCAN uses a string. 
+- Columns are labelled ```lat``` and ```lon``` and contain the lat and lon in 
+degrees for each of the distributed sensors (or ```E```, ```N``` in the case of 
+```utm```).
+
+#### Irradiance Data
+Measurements consist of the individual sensor time series with a shared time 
+index. Upon use of ```pandas.read_hdf()``` the data will be brought into a 
+DataFrame object. Each individual sensor has its own column. 
+
+- Index of the DataFrame is the timestamp referenced to a timezone
+- Columns contain the time series for each individual sensor, and are keyed by
+the site id (HOPE - integer, NRCAN - string).
+
 """
 
 

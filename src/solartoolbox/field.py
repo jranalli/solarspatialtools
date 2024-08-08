@@ -72,7 +72,7 @@ def compute_predicted_position(dfs, pos_utm, ref, cld_vecs=None,
     .. [1] Ranalli, J., Hobbs, W., 2024. PV Plant Equipment Labels and
        Layouts Can Be Validated by Analyzing Cloud Motion in Existing Plant
        Measurements. IEEE Journal of Photovoltaics.
-       :doi:`https://doi.org/10.1109/JPHOTOV.2024.3366666`
+       DOI: `https://doi.org/10.1109/JPHOTOV.2024.3366666`
     """
 
     # Note: This approach computes results for a single reference. The sub-
@@ -293,16 +293,11 @@ def cascade_remap(remap1, remap2):
     second remap into the second column from the first remap, and keeping the
     outer values as the result. This is a bit confusing, but the example below
     should help clarify.
-            remap1 = [('A', 'B'),
-                      ('B', 'C'),
-                      ('C', 'A')]
-            remap2 = [('A', 'B'),
-                      ('B', 'C'),
-                      ('C', 'A')]
 
-            result = [('A', 'C'),
-                      ('B', 'A'),
-                      ('C', 'B')]
+    remap1 = [('A', 'B'), ('B', 'C'), ('C', 'A')]
+    remap2 = [('A', 'B'), ('B', 'C'), ('C', 'A')]
+
+    result = [('A', 'C'), ('B', 'A'), ('C', 'B')]
 
     Typically, values of remap inputs would be obtained from the
     `assign_positions` function.

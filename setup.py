@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
-ver = '0.4.0'
+ver = '0.4.1'
 
 
 setup(
@@ -19,14 +19,14 @@ setup(
     package_dir={"": "src"},
     packages=find_packages(where="src"),
     install_requires=[
+        'numpy<2',
         'pandas',
         'tables',  # possibly must be installed separately via conda pytables because of MS dependency
-        'numpy',
         'pyproj',
         'pvlib',
         'netcdf4',
         'scipy'
     ],
     license='BSD (3 Clause)',
-    extras_require=dict(tests=['pytest'], demos=['matplotlib', 'jupyter']),
+    extras_require=dict(tests=['pytest'], demos=['matplotlib', 'jupyter'], docs=['sphinx', 'nbsphinx', 'sphinx_rtd_theme']),
 )

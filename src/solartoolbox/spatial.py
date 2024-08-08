@@ -282,6 +282,7 @@ def rect2pol(x, y):
 def pol2rect(r, theta):
     """
     2D polar vector to cartesian form
+
     Parameters
     ----------
     r : numeric
@@ -304,6 +305,7 @@ def pol2rect(r, theta):
 def rotate_vector(vector, theta):
     """
     2D rotation of a vector in cartesian form
+
     Parameters
     ----------
     vector : (x, y) numeric
