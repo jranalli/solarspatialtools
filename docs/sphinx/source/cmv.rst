@@ -1,10 +1,10 @@
-.. currentmodule:: solartoolbox
+.. currentmodule:: solarspatialtools
 
 Cloud Motion Vector Identification
 ----------------------------------
 The `cmv` module contains tools for identifying the cloud motion vector (CMV) from a distributed network of measurement sensors. Two methods are implemented, that of Jamaly and Kleissl [1] and of Gagne et al. [2].
 
-The tool also contains a function for identifying the optimum subset of CMV vectors from among a long list of CMV pairs. This functions serves as part of the automated CMV identification workflow that serves the :mod:`solartoolbox.field` module.
+The tool also contains a function for identifying the optimum subset of CMV vectors from among a long list of CMV pairs. This functions serves as part of the automated CMV identification workflow that serves the :mod:`solarspatialtools.field` module.
 
 See examples found in the :ref:`cmv-examples` section. `cmv_demo` highlights identification of the CMV, while `automate_cmv_demo` shows how a group of useful CMVs can be downselected from a long time series of data [3].
 
@@ -14,7 +14,7 @@ See examples found in the :ref:`cmv-examples` section. `cmv_demo` highlights ide
 
 [3] J. Ranalli and W.B. Hobbs, “Automating Methods for Validating PV Plant Equipment Labels,” 52nd IEEE PV Specialists Conference, 2024.
 
-.. automodule:: solartoolbox.cmv
+.. automodule:: solarspatialtools.cmv
 
 
     .. rubric:: Functions

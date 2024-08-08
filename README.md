@@ -1,7 +1,7 @@
-# SolarToolbox
+# SolarSpatialTools
 Spatial analysis tools for solar energy research
 
-`solartoolbox` is a python package containing implementations of various spatial algorithms for solar energy data. While excellent open source solar energy packages already exist (e.g. [pvlib-python](https://github.com/pvlib/pvlib-python) and [pvanalytics](https://github.com/pvlib/pvanalytics)), the complexity of some high-level analyses found in the academic literature makes them as a poor fit for the scope of existing packages. This package fills that gap by implementing techniques that we hope can facilitate common spatial tasks for solar energy researchers and provide a platform for consistency and efficiency improvements in these calculations. 
+`solarspatialtools` is a python package containing implementations of various spatial algorithms for solar energy data. While excellent open source solar energy packages already exist (e.g. [pvlib-python](https://github.com/pvlib/pvlib-python) and [pvanalytics](https://github.com/pvlib/pvanalytics)), the complexity of some high-level analyses found in the academic literature makes them as a poor fit for the scope of existing packages. This package fills that gap by implementing techniques that we hope can facilitate common spatial tasks for solar energy researchers and provide a platform for consistency and efficiency improvements in these calculations. 
 
 Two examples of what are believed to be the most generally useful techniques this package implements are:
 - Processing the cloud motion vector from a distributed sensor network. 
@@ -11,7 +11,7 @@ Two examples of what are believed to be the most generally useful techniques thi
 The package can be most easily installed via [PyPi](https://pypi.org/project/solartoolbox/) 
 with the following command:
 ```bash
-pip install solartoolbox
+pip install solarspatialtools
 ```
 
 # Getting Started
@@ -88,7 +88,7 @@ warranted.
   - See `dataio\hope_campaign.py` for details on the original dataset.
   - See `signalproc_demo.py` for examples using this data. 
 
-## Function libraries in solartoolbox (root level)
+## Function libraries in solarspatialtools (root level)
 
 ```cmv```  
 Functions for computing the cloud motion vector from a distributed irradiance 
@@ -136,8 +136,9 @@ Changes to the contribution guidelines and policies may be made in the future in
 This project is licensed under the BSD 3-Clause License - see the [LICENSE](https://github.com/jranalli/solartoolbox/blob/main/LICENSE) file for full details. 
 
 # History
-Solartoolbox began as a library of tools developed to support my own research 
-activities on solar energy. It was always shared publicly to encourage use by 
+SolarSpatialTools began as a library of tools developed to support my own 
+research activities on solar energy. Initial publication took place under the 
+name of `solartoolbox`. It was always shared publicly to encourage use by 
 interested parties and make a small contribution to open science and promoting
 reproducibility in the field. As a result, most initial releases lacked full 
 documentation and the structure of the library underwent some significant 

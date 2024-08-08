@@ -5,8 +5,8 @@ import numpy as np
 import numpy.testing as npt
 import pandas as pd
 
-import solartoolbox.signalproc
-from solartoolbox import stats
+import solarspatialtools.signalproc
+from solarspatialtools import stats
 
 
 class TestErrorFunctions:

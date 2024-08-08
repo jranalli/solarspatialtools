@@ -5,7 +5,7 @@ from scipy import signal
 from scipy.interpolate import interp1d
 from scipy.optimize import curve_fit, leastsq
 
-from solartoolbox import spatial
+from solarspatialtools import spatial
 
 
 def correlation(baseline, estimation, scaling='coeff'):
