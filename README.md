@@ -7,8 +7,15 @@ Two examples of what are believed to be the most generally useful techniques thi
 - Processing the cloud motion vector from a distributed sensor network. 
 - Verifying the locations of field components (e.g. combiners) within a distributed network of measurements
 
+[![ReadTheDocs status](https://readthedocs.org/projects/solarspatialtools/badge/?version=stable)](https://solarspatialtools.readthedocs.io/en/stable/?badge=stable)
+[![test status](https://github.com/jranalli/solarspatialtools/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/jranalli/solarspatialtools/actions/workflows/tests.yml/badge.svg?branch=main)
+
+[![joss status](https://joss.theoj.org/papers/04aaa860013faf055d69b673d44f5fab/status.svg)](https://joss.theoj.org/papers/04aaa860013faf055d69b673d44f5fab)
+
+
+
 # Installation
-The package can be most easily installed via [PyPi](https://pypi.org/project/solartoolbox/) 
+The package can be most easily installed via [PyPi](https://pypi.org/project/solarspatialtools/) 
 with the following command:
 ```bash
 pip install solarspatialtools
@@ -30,6 +37,8 @@ The index of ```pos``` needs to match the columns of ```ts_data``` so that the c
 The codes are organized into a few subpackages and several function libraries.
 The subpackages are meant to contain tools that are related to a specific
 task. 
+
+Full API documentation is available at ReadTheDocs: [https://solarspatialtools.readthedocs.io/en/stable/](https://solarspatialtools.readthedocs.io/en/stable/)
 
 ### Packages
 ```dataio```  
@@ -125,15 +134,15 @@ motion.
 # Contributing
 This is an open source project and appreciates participation, engagement and contribution from community members. Development on the library is active and the project seeks to provide a useful tool for the research community. The project is currently maintained by an individual researcher, and the process for contributions is not as formalized as it might be for larger projects.     
 
-If you've found a bug or have an idea for a new feature, please open an [issue](https://github.com/jranalli/solartoolbox/issues) 
-on GitHub. Questions can be asked in the GitHub [discussions](https://github.com/jranalli/solartoolbox/discussions).
+If you've found a bug or have an idea for a new feature, please open an [issue](https://github.com/jranalli/solarspatialtools/issues) 
+on GitHub. Questions can be asked in the GitHub [discussions](https://github.com/jranalli/solarspatialtools/discussions).
 
 Code contributions are also welcome! Please follow the instructions in GitHub's [getting started guide](https://docs.github.com/en/get-started/start-your-journey/hello-world) to open a pull request. 
 
 Changes to the contribution guidelines and policies may be made in the future in response to growth of the project and community.
 
 # License
-This project is licensed under the BSD 3-Clause License - see the [LICENSE](https://github.com/jranalli/solartoolbox/blob/main/LICENSE) file for full details. 
+This project is licensed under the BSD 3-Clause License - see the [LICENSE](https://github.com/jranalli/solarspatialtools/blob/main/LICENSE) file for full details. 
 
 # History
 SolarSpatialTools began as a library of tools developed to support my own 
