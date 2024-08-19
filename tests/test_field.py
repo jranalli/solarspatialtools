@@ -88,7 +88,7 @@ def test_compute_predicted_position_static(refdat):
     ref = refdat[2][0]
     expect = refdat[2][1]
 
-    datafile = "../docs/sphinx/source/demos/data/sample_plant_2.h5"
+    datafile = "../demos/data/sample_plant_2.h5"
     cmv_a = spatial.pol2rect(9.52, 0.62)
     cmv_b = spatial.pol2rect(8.47, 2.17)
 

@@ -64,4 +64,7 @@ site itself.
 # Version 0.4.3 & 0.4.4
 - Fixes to GitHub deployment issues, no functional changes
 # Version 0.4.5
-- 
+- Improvements to documentation
+- Simplification of github actions
+- Added matplotlib dependency
+- Move demos back to the parent directory using nblink
