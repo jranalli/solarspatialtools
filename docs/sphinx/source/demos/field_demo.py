@@ -13,7 +13,13 @@ from solarspatialtools import spatial, field
 # two time periods A) and B) that represent two different CMV periods
 datafile = "data/sample_plant_2.h5"
 
-# Input the CMVs, see cmv_demo.py for examples of how to calculate these
+# Input the CMVs, see cmv_demo.py for examples of how to calculate these. It's
+# important to note that the CMVs as calculated using the CMV module would be
+# dependant on accurate field positions. So it's important in this step that
+# the CMVs either come from an independent source, or that the errors in the
+# field positions are isolated incidents, and the location data for the plant
+# as a whole is somewhat accurate. Plants that were completely scrambled would
+# likely require special treatment that we haven't tested the method on.
 cmv_a = spatial.pol2rect(9.52, 0.62)
 cmv_b = spatial.pol2rect(8.47, 2.17)
 
