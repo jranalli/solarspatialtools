@@ -50,3 +50,6 @@ autodoc_member_order = 'bysource'
 # -- Options for EPUB output
 epub_show_urls = 'footnote'
 
+# Hide warning per sphinx #12300, appears to come from nbsphinx or nbsphinx_link
+suppress_warnings = ["config.cache"]
+
