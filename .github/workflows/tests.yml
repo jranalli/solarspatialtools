@@ -21,21 +21,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install -e .[tests]
 
-    - name: Test cmv
+    - name: Run All Tests
       working-directory: ./tests
-      run: pytest test_cmv.py
-    - name: Test field
-      working-directory: ./tests
-      run: pytest test_field.py
-    - name: Test irradiance
-      working-directory: ./tests
-      run: pytest test_irradiance.py
-    - name: Test signalproc
-      working-directory: ./tests
-      run: pytest test_signalproc.py
-    - name: Test spatial
-      working-directory: ./tests
-      run: pytest test_spatial.py
-    - name: Test stats
-      working-directory: ./tests
-      run: pytest test_stats.py
+      run: pytest
