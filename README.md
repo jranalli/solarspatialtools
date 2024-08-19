@@ -21,6 +21,13 @@ with the following command:
 pip install solarspatialtools
 ```
 
+If you wish to run the demo jupyter notebooks locally, you can specify that the additional dependencies should also be installed when you install the package:
+```bash
+pip install solarspatialtools[demos]
+```
+
+Alternatively, you could manually install `jupyter` in your environment.
+
 # Getting Started
 A number of example codes are available in the demos folder. These are meant to demonstrate what are believed to be the most useful functions in the package and applications of the functions to real sample data included with the library.
 
