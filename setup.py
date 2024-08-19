@@ -14,7 +14,7 @@ setup(
     description="Spatial analysis tools for solar energy research",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/jranalli/solartoolbox",
+    url="https://github.com/jranalli/solarspatialtools",
     download_url="https://github.com/jranalli/solarspatialtools/archive/{}.tar.gz".format(ver),
     package_dir={"": "src"},
     packages=find_packages(where="src"),
