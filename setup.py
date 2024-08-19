@@ -29,5 +29,5 @@ setup(
         'matplotlib<=3.9.2',
     ],
     license='BSD (3 Clause)',
-    extras_require=dict(tests=['pytest'], demos=['jupyter'], docs=['sphinx', 'nbsphinx', 'sphinx_rtd_theme', 'ipython']),
+    extras_require=dict(tests=['pytest'], demos=['jupyter'], docs=['sphinx', 'nbsphinx', 'sphinx_rtd_theme', 'ipython', 'nbsphinx-link']),
 )
