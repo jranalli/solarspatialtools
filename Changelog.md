@@ -68,3 +68,5 @@ site itself.
 - Simplification of github actions
 - Added matplotlib dependency
 - Move demos back to the parent directory using nblink
+# Version 0.4.6 - Sept 13, 2024
+- Fix license name in cfg
