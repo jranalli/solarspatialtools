@@ -34,7 +34,7 @@ def test_clearsky_index():
     assert_allclose(out, expected, atol=0.001)
 
     # GHI series & CS series
-    times = pd.date_range(start='20180601', periods=2, freq='12H')
+    times = pd.date_range(start='20180601', periods=2, freq='12h')
     ghi_measured = pd.Series([100,  500], index=times)
     ghi_modeled = pd.Series([500, 1000], index=times)
     out = clearsky_index(ghi_measured, ghi_modeled)
@@ -44,7 +44,7 @@ def test_clearsky_index():
     assert out.values == approx(expected.values)
 
     # GHI 2D frame & CS 1D series
-    times = pd.date_range(start='20180601', periods=3, freq='12H')
+    times = pd.date_range(start='20180601', periods=3, freq='12h')
     ghi_measured = pd.DataFrame([[100,  100], [200, 200], [500, 500]], index=times)
     ghi_modeled = pd.Series([500, 800, 1000], index=times)
     out = clearsky_index(ghi_measured, ghi_modeled)

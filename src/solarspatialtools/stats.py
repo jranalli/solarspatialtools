@@ -383,7 +383,10 @@ def calc_quantile(timeseries, n_days="30d", quantile=0.9):
                                    p90.index.astype(str))
 
         # Concat this day onto the output object
-        out_df = pd.concat((out_df, p90), axis=0)
+        if len(out_df) == 0:
+            out_df = p90
+        else:
+            out_df = pd.concat((out_df, p90), axis=0)
 
     # localize the timeseries and the column names back to the input
     out_df = out_df.tz_localize(ts.index.tz).reindex(ts.index)

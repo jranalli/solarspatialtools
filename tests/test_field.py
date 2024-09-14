@@ -130,7 +130,7 @@ def test_compute_delays(delay, delay_method):
     y3 = np.roll(x, int(3*delay * fs))
     y4 = np.roll(x, int(4*delay * fs))
 
-    df = pd.DataFrame(np.array([x,y1,y2,y3,y4]).T, index=pd.TimedeltaIndex(t, 's'), columns=['x1','x2','x3','x4','x5'])
+    df = pd.DataFrame(np.array([x,y1,y2,y3,y4]).T, index=pd.to_timedelta(t, 's'), columns=['x1','x2','x3','x4','x5'])
     ref = 'x1'
 
     delays, coh = field.compute_delays(df, ref, navgs=5, coh_limit=0.6, freq_limit=1, method=delay_method)
@@ -154,7 +154,7 @@ def test_compute_delays_nan(delay_method):
     y3 = np.roll(x, int(3*delay * fs))
     y4 = np.nan * np.zeros_like(y3)
 
-    df = pd.DataFrame(np.array([x,y1,y2,y3,y4]).T, index=pd.TimedeltaIndex(t, 's'), columns=['x1','x2','x3','x4','x5'])
+    df = pd.DataFrame(np.array([x,y1,y2,y3,y4]).T, index=pd.to_timedelta(t, 's'), columns=['x1','x2','x3','x4','x5'])
     ref = 'x1'
 
     delays, coh = field.compute_delays(df, ref, navgs=5, coh_limit=0.6, freq_limit=1, method=delay_method)

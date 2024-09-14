@@ -76,7 +76,7 @@ def test_cmv_artificial(theta_deg, velocity, mode):
     signals[4, :] = x
     for i, delay in enumerate(delays):
         signals[i, :] = np.roll(x, int(delay*fs))
-    df = pd.DataFrame(signals.T, index=pd.TimedeltaIndex(t, 's'))
+    df = pd.DataFrame(signals.T, index=pd.to_timedelta(t, 's'))
 
     # Compute the CMV
     cld_spd, cld_dir, dat = cmv.compute_cmv(df, pos_utm,
