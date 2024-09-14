@@ -70,3 +70,6 @@ site itself.
 - Move demos back to the parent directory using nblink
 # Version 0.4.6 - Sept 13, 2024
 - Fix license name in cfg
+# Version 0.4.7 - Sept 14, 2024
+- Updating dependencies  and test targets
+- Fix deprecation warnings raised by numpy

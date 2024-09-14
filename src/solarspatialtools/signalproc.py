@@ -462,7 +462,7 @@ def tf_delay(tf, coh, coh_limit=0.6, freq_limit=0.02, method='fit'):
 
     if method == 'diff':
         if not np.any(np.array(np.shape(tf)) == 1):
-            raise ValueError('tf must be a 1D array for method: fit')
+            raise ValueError('tf must be a 1D array for method: diff')
 
         # # Method 1: unwrap phase and take derivative
         tfv = tf.values.flatten()
@@ -479,7 +479,7 @@ def tf_delay(tf, coh, coh_limit=0.6, freq_limit=0.02, method='fit'):
         try:
             return (curve_fit(_delay_fitter,
                               np.expand_dims(tf.index, axis=1)[ix],
-                              np.unwrap(np.angle(tf.loc[ix]).flatten()))[0],
+                              np.unwrap(np.angle(tf.loc[ix]).flatten()))[0].item(),
                     ix)
         except ValueError:
             from warnings import warn
@@ -653,7 +653,7 @@ def compute_delays(ts_in, ts_out, mode='loop', scaling='coeff'):
 
             extras['peak_corr'][i] = xcorr[peak_lag_index]
             extras['mean_corr'][i] = np.mean(xcorr)
-            extras['zero_corr'][i] = xcorr[zero_lag_ind]
+            extras['zero_corr'][i] = xcorr[zero_lag_ind].item()
 
         # Scale
         extras['peak_corr'] *= corr_scale

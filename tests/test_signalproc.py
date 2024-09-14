@@ -77,7 +77,7 @@ def test_averaged_psd():
     T = 5.0    # seconds
     t = np.linspace(0, T, int(T*fs), endpoint=False)  # time variable
     x = 0.5*np.sin(2*np.pi*2*t)  # +0.1*np.sin(2*np.pi*10*t)
-    input_tsig = pd.Series(x, index=pd.TimedeltaIndex(t, 's'))
+    input_tsig = pd.Series(x, index=pd.to_timedelta(t, 's'))
 
     # Calculate the averaged PSD using the function
     navgs = 5
@@ -103,8 +103,8 @@ def test_averaged_tf():
     t = np.linspace(0, T, int(T*fs), endpoint=False)  # time variable
     x = 0.5*np.sin(2*np.pi*2*t)  # input signal
     y = 0.5*np.sin(2*np.pi*2*t + np.pi/4)  # output signal with phase shift
-    x_tsig = pd.Series(x, index=pd.TimedeltaIndex(t, 's'))
-    y_tsig = pd.Series(y, index=pd.TimedeltaIndex(t, 's'))
+    x_tsig = pd.Series(x, index=pd.to_timedelta(t, 's'))
+    y_tsig = pd.Series(y, index=pd.to_timedelta(t, 's'))
 
     # Calculate the averaged transfer function using the function
     navgs = 5
@@ -168,8 +168,8 @@ def test_tf_delay(delay):
     noise = np.random.random(len(t))/5  # add broadband noise
     x = 0.5*np.sin(2*np.pi*2*t) + noise  # noisy signal
     y = np.roll(x, int(delay*fs))  # Explicitly delay the signal
-    x_tsig = pd.Series(x, index=pd.TimedeltaIndex(t, 's'))
-    y_tsig = pd.Series(y, index=pd.TimedeltaIndex(t, 's'))
+    x_tsig = pd.Series(x, index=pd.to_timedelta(t, 's'))
+    y_tsig = pd.Series(y, index=pd.to_timedelta(t, 's'))
 
     # Calculate the averaged transfer function using the function
     navgs = 5
@@ -199,8 +199,8 @@ def test_tf_delay_multi(delay):
     y2 = np.roll(x, int(2 * delay * fs))
     y3 = np.roll(x, int(3 * delay * fs))
     y4 = np.roll(x, int(4 * delay * fs))
-    x_tsig = pd.Series(x, index=pd.TimedeltaIndex(t, 's'))
-    ysigs = [pd.Series(y, index=pd.TimedeltaIndex(t, 's')) for y in
+    x_tsig = pd.Series(x, index=pd.to_timedelta(t, 's'))
+    ysigs = [pd.Series(y, index=pd.to_timedelta(t, 's')) for y in
              [y1, y2, y3, y4]]
     ysigs_df = pd.DataFrame(np.array(ysigs).T, columns=[0, 1, 2, 3],
                             index=ysigs[0].index)
@@ -235,8 +235,8 @@ def test_tf_delay_nan():
     y3 = np.roll(x, int(3 * delay * fs))
     y4 = np.nan * np.zeros_like(y3)
 
-    x_tsig = pd.Series(x, index=pd.TimedeltaIndex(t, 's'))
-    ysigs = [pd.Series(y, index=pd.TimedeltaIndex(t, 's')) for y in
+    x_tsig = pd.Series(x, index=pd.to_timedelta(t, 's'))
+    ysigs = [pd.Series(y, index=pd.to_timedelta(t, 's')) for y in
              [y1, y2, y3, y4]]
     ysigs_df = pd.DataFrame(np.array(ysigs).T, columns=[0, 1, 2, 3],
                             index=ysigs[0].index)
@@ -267,8 +267,8 @@ def test_xcorr_delay(delay):
     noise = np.random.random(len(t))/5  # add broadband noise
     x = 0.5*np.sin(2*np.pi*0.01*t) + noise  # noisy signal
     y = np.roll(x, int(delay*fs))  # Explicitly delay the signal
-    x_tsig = pd.Series(x, index=pd.TimedeltaIndex(t, 's'))
-    y_tsig = pd.Series(y, index=pd.TimedeltaIndex(t, 's'))
+    x_tsig = pd.Series(x, index=pd.to_timedelta(t, 's'))
+    y_tsig = pd.Series(y, index=pd.to_timedelta(t, 's'))
 
     # Calculate the averaged transfer function using the function
     delay_result, _ = xcorr_delay(x_tsig, y_tsig, "coeff")
@@ -310,7 +310,7 @@ def test_averaged_psd_multi():
     x4 = 0.5 * np.sin(2 * np.pi * 2 * t) + np.random.random(len(t))
 
     xs = [x1, x2, x3, x4]
-    tsigs = [pd.Series(x, index=pd.TimedeltaIndex(t, 's')) for x in xs]
+    tsigs = [pd.Series(x, index=pd.to_timedelta(t, 's')) for x in xs]
     tsigs_df = pd.DataFrame(np.array(tsigs).T, columns=[0, 1, 2, 3], index=tsigs[0].index)
     navgs = 5
     overlap = 0.5
@@ -342,8 +342,8 @@ def test_averaged_tf_multiout():
     y2 = np.roll(x, int(2*delay * fs))
     y3 = np.roll(x, int(3*delay * fs))
     y4 = np.roll(x, int(4*delay * fs))
-    x_tsig = pd.Series(x, index=pd.TimedeltaIndex(t, 's'))
-    ysigs = [pd.Series(y, index=pd.TimedeltaIndex(t, 's')) for y in [y1, y2, y3, y4]]
+    x_tsig = pd.Series(x, index=pd.to_timedelta(t, 's'))
+    ysigs = [pd.Series(y, index=pd.to_timedelta(t, 's')) for y in [y1, y2, y3, y4]]
     ysigs_df = pd.DataFrame(np.array(ysigs).T, columns=[0, 1, 2, 3], index=ysigs[0].index)
 
     navgs = 5
@@ -378,8 +378,8 @@ def test_averaged_tf_multiin():
     y2 = np.roll(x, int(2*delay * fs))
     y3 = np.roll(x, int(3*delay * fs))
     y4 = np.roll(x, int(4*delay * fs))
-    x_tsig = pd.Series(x, index=pd.TimedeltaIndex(t, 's'))
-    ysigs = [pd.Series(y, index=pd.TimedeltaIndex(t, 's')) for y in [y1, y2, y3, y4]]
+    x_tsig = pd.Series(x, index=pd.to_timedelta(t, 's'))
+    ysigs = [pd.Series(y, index=pd.to_timedelta(t, 's')) for y in [y1, y2, y3, y4]]
     ysigs_df = pd.DataFrame(np.array(ysigs[0]).T, columns=[0], index=ysigs[0].index)
 
     xsigs = [x_tsig, ysigs[0], ysigs[1], ysigs[2]]
@@ -416,8 +416,8 @@ def test_averaged_tf_multiboth():
     y2 = np.roll(x, int(2*delay * fs))
     y3 = np.roll(x, int(3*delay * fs))
     y4 = np.roll(x, int(4*delay * fs))
-    x_tsig = pd.Series(x, index=pd.TimedeltaIndex(t, 's'))
-    ysigs = [pd.Series(y, index=pd.TimedeltaIndex(t, 's')) for y in [y1, y2, y3, y4]]
+    x_tsig = pd.Series(x, index=pd.to_timedelta(t, 's'))
+    ysigs = [pd.Series(y, index=pd.to_timedelta(t, 's')) for y in [y1, y2, y3, y4]]
     ysigs_df = pd.DataFrame(np.array(ysigs).T, columns=[0, 1, 2, 3], index=ysigs[0].index)
 
     xsigs = [x_tsig, ysigs[0], ysigs[1], ysigs[2]]
@@ -464,8 +464,8 @@ def test_compute_delays(delay, compute_delays_modes):
         ys.append(yi)
         delay_ins.append(deli)
 
-    x_tsig = pd.Series(x, index=pd.TimedeltaIndex(t, 's'))
-    ysigs = [pd.Series(y, index=pd.TimedeltaIndex(t, 's')) for y in ys]
+    x_tsig = pd.Series(x, index=pd.to_timedelta(t, 's'))
+    ysigs = [pd.Series(y, index=pd.to_timedelta(t, 's')) for y in ys]
     xsigs = [x_tsig for y in ys]
     xsigs = pd.DataFrame(np.array(xsigs).T, index=x_tsig.index)
 

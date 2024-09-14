@@ -254,6 +254,9 @@ def magnitude(vec):
     magnitude : numeric
         the magnitude of the vector
     """
+    # respond differently for Pandas Types
+    if isinstance(vec, pd.Series):
+        return np.sqrt(vec.iloc[0]**2 + vec.iloc[1]**2)
     return np.sqrt(vec[0]**2+vec[1]**2)
 
 
