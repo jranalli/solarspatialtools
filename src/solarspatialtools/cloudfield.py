@@ -1,5 +1,7 @@
 import numpy as np
-from scipy.interpolate import RegularGridInterpolator
+from jupyterlab.utils import deprecated
+# from scipy.interpolate import RegularGridInterpolator, RectBivariateSpline
+from scipy.ndimage import map_coordinates
 
 import matplotlib.pyplot as plt
 from scipy.ndimage import sobel, uniform_filter
@@ -35,11 +37,23 @@ def _random_at_scale(rand_size, final_size, plot=False):
     xnew = np.linspace(0, 1, final_size[0])
     ynew = np.linspace(0, 1, final_size[1])
 
-    interp_f = RegularGridInterpolator((x, y), random, method='linear')
+    # # # New Scipy Method
+    # interp_f = RegularGridInterpolator((x, y), random, method='linear')
+    # Xnew, Ynew = np.meshgrid(xnew, ynew, indexing='ij')
+    # random_new = interp_f((Xnew, Ynew))
+    # return random_new
+
+    # # # Alternate Scipy Method
+    # interp_f = RectBivariateSpline(x, y, random, kx=1, ky=1)
+    # # interp_ft = lambda xnew, ynew: interp_f(xnew, ynew).T
+    # random_new = interp_f(xnew, ynew)
+    # return random_new
+
+    # # Different potentially faster Scipy Method
     Xnew, Ynew = np.meshgrid(xnew, ynew, indexing='ij')
-    random_new = interp_f((Xnew, Ynew))
-
-
+    Xnew = Xnew*len(x)
+    Ynew = Ynew*len(y)
+    random_new = map_coordinates(random, [Xnew.ravel(), Ynew.ravel()], order=1, mode='nearest').reshape(final_size)
 
     if plot:
         # generate side by side subplots to compare
@@ -396,6 +410,14 @@ if __name__ == '__main__':
     field_final = lave_scaling_exact(cfield, clear_mask, smoothed, ktmean, ktmax, kt1pct, plot=False)
 
     plt.plot(field_final[1,:])
+    plt.show()
+
+    plt.hist(kt, bins=50)
+    plt.hist(field_final[1,:], bins=50)
+    plt.show()
+
+    plt.hist(np.diff(kt), bins=50)
+    plt.hist(np.diff(field_final[1,:]), bins=50)
     plt.show()
 
     # assert np.all(r == rnew)
