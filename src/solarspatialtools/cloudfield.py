@@ -128,18 +128,33 @@ def stacked_field(vs, size, weights=None, scales=(1, 2, 3, 4, 5, 6, 7), plot=Fal
 
     return field
 
-def _clip_field(field, kt=0.5, plot=False):
+def _clip_field(field, clear_frac=0.5, plot=False):
+    """
+    Find the value in the field that will produce an X% clear sky mask. The
+    mask is 1 where clear, and 0 where cloudy.
+
+    Parameters
+    ----------
+    field
+    clear_frac
+    plot
+
+    Returns
+    -------
+
+    """
     # Zero where clouds, 1 where clear
 
     # clipping needs to be based on pixel fraction, which thus needs to be
     # done on quantile because the field has a normal distribution
-    quant = np.quantile(field, kt)
+    quant = np.quantile(field, clear_frac)
 
     # Find that quantile and cap it
     field_out = np.ones_like(field)
     field_out[field > quant] = 0
 
-    assert (np.isclose(kt, np.sum(field_out) / field.size, rtol=1e-3))
+    # Test to make sure that we're close to matching the desired fraction
+    assert (np.isclose(clear_frac, np.sum(field_out) / field.size, rtol=1e-3))
 
     if plot:
         plt.imshow(field_out, extent=(0, field.shape[1], 0, field.shape[0]))
@@ -147,26 +162,39 @@ def _clip_field(field, kt=0.5, plot=False):
 
     return field_out
 
-def _find_edges(size, plot=False):
-    edges = np.abs(sobel(out_field))
+def _find_edges(base_mask, size, plot=False):
+    """
+    Find the edges of the field using a sobel filter and then smooth it with a
+    Parameters
+    ----------
+    size
+    plot
+
+    Returns
+    -------
+
+    """
+
+    # This gets us roughly 50% overlapping with mask and 50% outside
+    edges = np.abs(sobel(base_mask))
     smoothed = uniform_filter(edges, size=size)
 
     # We want to binarize it
     smoothed[smoothed < 1e-5] = 0  # Zero out the small floating point values
     # Calculate a threshold based on quantile, because otherwise we get the whole clouds
     baseline = np.quantile(smoothed[smoothed>0], 0.5)
-    smoothed = smoothed > baseline
+    smoothed_binary = smoothed > baseline
 
     if plot:
         # Compare the edges and uniform filtered edges side by side
         fig, axs = plt.subplots(1, 2, figsize=(10, 5))
         axs[0].imshow(edges, extent=(0, ysiz, 0, xsiz))
         axs[0].set_title('Edges')
-        axs[1].imshow(smoothed, extent=(0, ysiz, 0, xsiz))
+        axs[1].imshow(smoothed_binary, extent=(0, ysiz, 0, xsiz))
         axs[1].set_title('Uniform Filtered Edges')
         plt.show()
 
-    return edges, smoothed
+    return edges, smoothed_binary
 
 def shift_mean_lave(field, ktmean, max_overshoot=1.4, ktmin=0.2, min_quant=0.005, max_quant=0.995, plot=True):
 
@@ -186,7 +214,7 @@ def shift_mean_lave(field, ktmean, max_overshoot=1.4, ktmin=0.2, min_quant=0.005
     # ##### Apply multiplier to shift mean to ktmean #####
 
     # Rescale the mean
-    tgtsum = np.prod(np.shape(field_out)) * ktmean  # Mean scaled over whole field
+    tgtsum = field_out.size * ktmean  # Mean scaled over whole field
     diff_sum = tgtsum - np.sum(field_out == 1)  # Shifting to exclude fully clear values
     tgt_mean = diff_sum / np.sum(field_out < 1)  # Recalculating the expected mean of the cloudy-only aareas
     current_cloud_mean = np.mean(field_out[field_out < 1]) # Actual cloud mean
@@ -213,15 +241,18 @@ def shift_mean_lave(field, ktmean, max_overshoot=1.4, ktmin=0.2, min_quant=0.005
     return field_out
 
 
-def lave_scaling_exact(field, ktmean, max_overshoot=1.4, ktmin=0.2, min_quant=0.005, max_quant=0.995, plot=True):
+def lave_scaling_exact(field, clear_mask, edge_mask, ktmean, ktmax=1.4, kt1pct=0.2, max_quant=0.99, plot=True):
 
     # ##### Shift values of kt to range from 0.2 - 1
 
     # Calc the "max" and "min", excluding clear values
-    field_min = np.quantile(field[field < 1], .99)
+    field_max = np.quantile(field[clear_mask == 0], max_quant)
+    print(f"Field Max: {field_max}")
+    print(f"kt1pct: {kt1pct}")
 
-    # Scale it between ktmin and max_overshoot
-    clouds3 = 1 - field*0.8/field_min
+    # Create a flipped version of the distribution that scales between slightly below kt1pct and bascially (1-field_min)
+    # I think the intent here would be to make it vary between kt1pct and 1, but that's not quite what it does.
+    clouds3 = 1 - field*(1-kt1pct)/field_max
 
 
     # # Clip limits to sensible boundaries
@@ -229,49 +260,61 @@ def lave_scaling_exact(field, ktmean, max_overshoot=1.4, ktmin=0.2, min_quant=0.
     clouds3[clouds3 < 0] = 0
 
     # ##### Apply multiplier to shift mean to ktmean #####
-    mn = np.mean(clouds3)
-    minmn = np.min(clouds3)/mn
-    maxmn = np.max(clouds3/mn-minmn)
+    mean_c3 = np.mean(clouds3)
+    nmin_c3 = np.min(clouds3)/mean_c3
+    nrange_c3 = np.max(clouds3)/mean_c3-nmin_c3
+    ce = 1+ (clouds3/mean_c3-nmin_c3)/nrange_c3*(ktmax-1)
 
-    ce = 1+ (clouds3/mn-minmn)/maxmn*(1.4-1)
-
-    # Rescale the mean
-    tgtsum = np.prod(np.shape(field_out)) * ktmean  # Mean scaled over whole field
-    diff_sum = tgtsum - np.sum(field_out == 1)  # Shifting to exclude fully clear values
-    tgt_mean = diff_sum / np.sum(field_out < 1)  # Recalculating the expected mean of the cloudy-only aareas
-    current_cloud_mean = np.mean(field_out[field_out < 1]) # Actual cloud mean
+    # Rescale one more time to make the mean of clouds3 match the ktmean from the timeseries
+    cloud_mask = np.bitwise_or(clear_mask>0, edge_mask) == 0  # Where is it neither clear nor edge
+    tgtsum = field.size * ktmean  # Mean scaled over whole field
+    diff_sum = tgtsum - np.sum(clear_mask) - np.sum(ce[np.bitwise_and(edge_mask > 0, clear_mask==0)])  # Shifting target to exclude fully clear values and the cloud enhancement
+    tgt_cloud_mean = diff_sum / np.sum(cloud_mask)  # Find average required in areas where it's neither cloud nor edge
+    current_cloud_mean = np.mean(clouds3[cloud_mask]) # Actual cloud mean
 
     if diff_sum > 0:
-        field_out[field_out!=1] = tgt_mean / current_cloud_mean * field_out[field_out!=1]
+        clouds4 = tgt_cloud_mean / current_cloud_mean * clouds3
+    else:
+        clouds4 = clouds3.copy()
 
-    # print(diff_sum)
-    # print(current_cloud_mean)
-    print(f"Desired Mean: {ktmean}, actual global mean {np.mean(field_out)}.")
+    clouds5 = clouds4.copy()
+
+    # Edges then clear means that the clearsky overrides the edge enhancement
+    clouds5[edge_mask] = ce[edge_mask > 0]
+    clouds5[clear_mask > 0] = 1
+    print(f"Desired Mean: {ktmean}, actual global mean {np.mean(clouds5)}.")
 
 
     if plot:
-        plt.hist(field_out[field_out<1].flatten(), bins=100)
-        plt.show()
+        plt.hist(ce.flatten(), bins=100)
+        plt.hist(clouds3.flatten(), bins=100, alpha=0.5)
+        plt.hist(clouds4.flatten(), bins=100, alpha=0.5)
+        plt.hist(clouds5.flatten(), bins=100, alpha=0.5)
+        plt.hist(field.flatten(), bins=100, alpha=0.5)
+        plt.legend(["Cloud Enhancement", "1st Scaled Cloud Distribution", "2nd Scaled Cloud Distribution", "Fully Remapped Distribution",
+                    "Original Field Distribution"])
 
-        # plot field and field_out side by side
         fig, axs = plt.subplots(1, 2, figsize=(10, 5))
         axs[0].imshow(field, extent=(0, ysiz, 0, xsiz))
         axs[0].set_title('Original Field')
-        axs[1].imshow(field_out, extent=(0, ysiz, 0, xsiz))
+        axs[1].imshow(clouds5, extent=(0, ysiz, 0, xsiz))
         axs[1].set_title('Shifted Field')
         plt.show()
-    return field_out
+
+    return clouds5
 
 
-def get_settings_from_timeseries(kt_ts, plot=True):
+def get_settings_from_timeseries(kt_ts, clear_threshold=0.95, plot=True):
     # Get the mean and standard deviation of the time series
-    ktmean = np.mean(kt_ts)
+    ktmean = np.mean(kt_ts)  # represents mean of kt
     ktstd = np.std(kt_ts)
-    ktmax = np.max(kt_ts)
+    ktmax = np.max(kt_ts)  # represents peak cloud enhancement
     ktmin = np.min(kt_ts)
 
-    # Get the fraction of clear sky
-    frac_clear = np.sum(kt_ts > 0.95) / np.prod(np.shape(kt_ts))
+    kt1pct = np.nanquantile(kt_ts, 0.01)  # represents "lowest" kt
+
+    # Get the fraction of clear sky with a threshold
+    frac_clear = np.sum(kt_ts > clear_threshold) / kt_ts.size
 
     vs = variability_score(kt) * 1e4
 
@@ -291,7 +334,7 @@ def get_settings_from_timeseries(kt_ts, plot=True):
     tmscales = [i+1 for i, _ in enumerate(tmscales[:-1])]
     weights = _calc_wavelet_weights(waves)
 
-    return ktmean, ktstd, ktmin, ktmax, frac_clear, vs, weights, tmscales
+    return ktmean, kt1pct, ktmax, frac_clear, vs, weights, tmscales
 
 
 
@@ -305,23 +348,26 @@ if __name__ == '__main__':
     twin = pd.date_range('2013-09-08 9:15:00', '2013-09-08 10:15:00', freq='1s', tz='UTC')
     data = pd.read_hdf(datafn, mode="r", key="data")
     data = data[40]
-    plt.plot(data)
-    plt.show()
+    # plt.plot(data)
+    # plt.show()
 
     pos = pd.read_hdf(datafn, mode="r", key="latlon")
     loc = pvlib.location.Location(np.mean(pos['lat']), np.mean(pos['lon']))
     cs_ghi = loc.get_clearsky(data.index, model='simplified_solis')['ghi']
-    cs_ghi = 1000/max(cs_ghi) * cs_ghi
+    cs_ghi = 1000/max(cs_ghi) * cs_ghi  # Rescale (possible scaling on
     kt = pvlib.irradiance.clearsky_index(data, cs_ghi, 2)
 
-    plt.plot(data)
-    plt.plot(cs_ghi)
-    plt.show()
+    # plt.plot(data)
+    # plt.plot(cs_ghi)
+    # plt.show()
+    #
+    # plt.plot(kt)
+    # plt.show()
 
-    plt.plot(kt)
-    plt.show()
+    # plt.hist(kt, bins=100)
+    # plt.show()
 
-    ktmean, ktstd, ktmin, ktmax, frac_clear, vs, weights, scales = get_settings_from_timeseries(kt, plot=False)
+    ktmean, kt1pct, ktmax, frac_clear, vs, weights, scales = get_settings_from_timeseries(kt, plot=False)
 
     print(f"Clear Fraction is: {frac_clear}")
 
@@ -332,21 +378,22 @@ if __name__ == '__main__':
 
     cfield = stacked_field(vs, (xsiz, ysiz), weights, scales)
 
-    mask_field = stacked_field(vs, (xsiz, ysiz), weights, scales)
-    mask_field = _clip_field(mask_field, frac_clear, plot=False)
+    clear_mask = stacked_field(vs, (xsiz, ysiz), weights, scales)
+    clear_mask = _clip_field(clear_mask, frac_clear, plot=False)  # 0 is cloudy, 1 is clear
+
 
     # Clear Everywhere
     out_field = np.ones_like(cfield)
     # Where it's cloudy, mask in the clouds
-    out_field[mask_field == 0] = cfield[mask_field == 0]
+    out_field[clear_mask == 0] = cfield[clear_mask == 0]
 
     # plt.imshow(out_field, extent=(0, ysiz, 0, xsiz))
     # plt.show()
 
-    edges, smoothed = _find_edges(3)
+    edges, smoothed = _find_edges(clear_mask, 3, plot=False)
 
     # field_final = shift_mean_lave(out_field, ktmean)
-    lave_scaling_exact(out_field, ktmean)
+    field_final = lave_scaling_exact(cfield, clear_mask, smoothed, ktmean, ktmax, kt1pct, plot=False)
 
     plt.plot(field_final[1,:])
     plt.show()
