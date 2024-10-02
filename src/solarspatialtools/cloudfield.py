@@ -1,7 +1,6 @@
 import numpy as np
-from jupyterlab.utils import deprecated
-# from scipy.interpolate import RegularGridInterpolator, RectBivariateSpline
-from scipy.ndimage import map_coordinates
+from scipy.interpolate import RegularGridInterpolator
+# from scipy.ndimage import map_coordinates
 
 import matplotlib.pyplot as plt
 from scipy.ndimage import sobel, uniform_filter
@@ -37,23 +36,21 @@ def _random_at_scale(rand_size, final_size, plot=False):
     xnew = np.linspace(0, 1, final_size[0])
     ynew = np.linspace(0, 1, final_size[1])
 
-    # # # New Scipy Method
-    # interp_f = RegularGridInterpolator((x, y), random, method='linear')
-    # Xnew, Ynew = np.meshgrid(xnew, ynew, indexing='ij')
-    # random_new = interp_f((Xnew, Ynew))
-    # return random_new
+    # # New Scipy Method
+    interp_f = RegularGridInterpolator((x, y), random, method='linear')
+    Xnew, Ynew = np.meshgrid(xnew, ynew, indexing='ij')
+    random_new = interp_f((Xnew, Ynew))
 
     # # # Alternate Scipy Method
     # interp_f = RectBivariateSpline(x, y, random, kx=1, ky=1)
     # # interp_ft = lambda xnew, ynew: interp_f(xnew, ynew).T
     # random_new = interp_f(xnew, ynew)
-    # return random_new
 
-    # # Different potentially faster Scipy Method
-    Xnew, Ynew = np.meshgrid(xnew, ynew, indexing='ij')
-    Xnew = Xnew*len(x)
-    Ynew = Ynew*len(y)
-    random_new = map_coordinates(random, [Xnew.ravel(), Ynew.ravel()], order=1, mode='nearest').reshape(final_size)
+    # # # Different potentially faster Scipy Method
+    # Xnew, Ynew = np.meshgrid(xnew, ynew, indexing='ij')
+    # Xnew = Xnew*len(x)
+    # Ynew = Ynew*len(y)
+    # random_new = map_coordinates(random, [Xnew.ravel(), Ynew.ravel()], order=1, mode='nearest').reshape(final_size)
 
     if plot:
         # generate side by side subplots to compare
@@ -106,6 +103,25 @@ def _calc_wavelet_weights(waves):
 
 
 def space_to_time(pixres=1, cloud_speed=50):
+
+    # Existing code uses 1 pixel per meter, and divides by cloud speed to get X size
+    # does 3600 pixels, but assumes the clouds move by one full timestep.
+
+    # ECEF coordinate system (Earth Centered Earth Fixed) is used to convert lat/lon to x/y.
+    # This seems really weird. https://en.wikipedia.org/wiki/Geographic_coordinate_conversion
+
+    # [X, Y] = geod2ecef(Lat_to_Sim, Lon_to_Sim, zeros(size(Lat_to_Sim)));
+    # ynorm1 = Y - mean(Y);
+    # xnorm1 = X - mean(X);
+    # ynorm=round((ynorm1-min(ynorm1))./Cloud_Spd(qq))+1;
+    # xnorm=round((xnorm1-min(xnorm1))./Cloud_Spd(qq))+1;
+    # Xsize=60*60+max(xnorm);
+    # Ysize=max(ynorm);
+    # Xsize and Ysize are the pixel sizes generated
+
+    # Extracting a time series has us loop through the entire size of X pixels, and choose a window 3600 pixels wide, and multiply by GHI_cs
+    # GHI_syn(i,hour(datetime2(GHI_timestamp))==h1)=clouds_new{h1}(ynorm(i),xnorm(i):xnorm(i)+3600-1)'.*GHI_clrsky(hour(datetime2(GHI_timestamp))==h1);
+
     pixjump = cloud_speed / pixres
     # n space
     # dx space
@@ -413,11 +429,11 @@ if __name__ == '__main__':
     plt.show()
 
     plt.hist(kt, bins=50)
-    plt.hist(field_final[1,:], bins=50)
+    plt.hist(field_final[1,:], bins=50, alpha=0.5)
     plt.show()
 
     plt.hist(np.diff(kt), bins=50)
-    plt.hist(np.diff(field_final[1,:]), bins=50)
+    plt.hist(np.diff(field_final[1,:]), bins=50, alpha=0.5)
     plt.show()
 
     # assert np.all(r == rnew)
