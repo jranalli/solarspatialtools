@@ -125,6 +125,25 @@ class TestFieldProcessing:
         assert np.sum(edges > 0) == 380
         assert np.sum(smoothed_binary) == 760
 
+    @pytest.fixture
+    def sample_data(self):
+        field = np.random.rand(100, 100)
+        clear_mask = np.zeros_like(field)
+        edge_mask = np.zeros_like(field)
+        edge_mask[25:75, 25:75] = 1
+        clear_mask[30:70, 30:70] = 1
+        edge_mask[clear_mask>0] = 0
+        return field, clear_mask, edge_mask
+
+    def test_scale_field_lave_basic(self, sample_data):
+        field, clear_mask, edge_mask = sample_data
+        ktmean = 0.5
+        ktmax = 1.08
+        kt1pct = 0.2
+        result = cloudfield._scale_field_lave(field, clear_mask, edge_mask, ktmean, ktmax, kt1pct)
+        assert result.shape == field.shape
+        assert np.isclose(np.mean(result), ktmean, atol=0.01)
+
 
 class TestWeights:
     """Tests generated with AI assistance"""
@@ -194,7 +213,7 @@ class TestWeights:
 
     def test_get_timeseries_props_basic(self):
         kt_ts = pd.Series(np.random.rand(1000))
-        ktmean, kt_1_pct, ktmax, frac_clear, vs, weights, scales = cloudfield.get_timeseries_props(kt_ts, plot=False)
+        ktmean, kt_1_pct, ktmax, frac_clear, vs, weights, scales = cloudfield.get_timeseries_stats(kt_ts, plot=False)
         assert isinstance(ktmean, float), "ktmean should be a float"
         assert isinstance(kt_1_pct, float), "kt_1_pct should be a float"
         assert isinstance(ktmax, float), "ktmax should be a float"
@@ -205,11 +224,11 @@ class TestWeights:
 
     def test_get_timeseries_props_all_clear(self):
         kt_ts = pd.Series(np.ones(1000))
-        ktmean, kt_1_pct, ktmax, frac_clear, vs, weights, scales = cloudfield.get_timeseries_props(kt_ts, plot=False)
+        ktmean, kt_1_pct, ktmax, frac_clear, vs, weights, scales = cloudfield.get_timeseries_stats(kt_ts, plot=False)
         assert frac_clear == 1.0, "frac_clear should be 1.0 for all-clear time series"
 
     def test_get_timeseries_props_all_cloudy(self):
         kt_ts = pd.Series(np.zeros(1000))
-        ktmean, kt_1_pct, ktmax, frac_clear, vs, weights, scales = cloudfield.get_timeseries_props(kt_ts, plot=False)
+        ktmean, kt_1_pct, ktmax, frac_clear, vs, weights, scales = cloudfield.get_timeseries_stats(kt_ts, plot=False)
         assert frac_clear == 0.0, "frac_clear should be 0.0 for all-cloudy time series"
 

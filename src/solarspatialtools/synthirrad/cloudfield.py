@@ -111,36 +111,6 @@ def _calc_wavelet_weights(waves):
     return scales / np.sum(scales)
 
 
-
-def space_to_time(pixres=1, cloud_speed=50):
-
-    # Existing code uses 1 pixel per meter, and divides by cloud speed to get X size
-    # does 3600 pixels, but assumes the clouds move by one full timestep.
-
-    # ECEF coordinate system (Earth Centered Earth Fixed) is used to convert lat/lon to x/y.
-    # This seems really weird. https://en.wikipedia.org/wiki/Geographic_coordinate_conversion
-
-    # [X, Y] = geod2ecef(Lat_to_Sim, Lon_to_Sim, zeros(size(Lat_to_Sim)));
-    # ynorm1 = Y - mean(Y);
-    # xnorm1 = X - mean(X);
-    # ynorm=round((ynorm1-min(ynorm1))./Cloud_Spd(qq))+1;
-    # xnorm=round((xnorm1-min(xnorm1))./Cloud_Spd(qq))+1;
-    # Xsize=60*60+max(xnorm);
-    # Ysize=max(ynorm);
-    # Xsize and Ysize are the pixel sizes generated
-
-    # Extracting a time series has us loop through the entire size of X pixels, and choose a window 3600 pixels wide, and multiply by GHI_cs
-    # GHI_syn(i,hour(datetime2(GHI_timestamp))==h1)=clouds_new{h1}(ynorm(i),xnorm(i):xnorm(i)+3600-1)'.*GHI_clrsky(hour(datetime2(GHI_timestamp))==h1);
-
-    pixjump = cloud_speed / pixres
-    # n space
-    # dx space
-    # velocity
-    # dt = dx / velocity
-    # max space = n * dx
-    # max time = max space / velocity
-
-
 def _stack_random_field(weights, scales, size, normalize=False, plot=False):
     """
     Generate a field of random clouds at different scales and weights based on Perlin Noise.
@@ -280,7 +250,35 @@ def _find_edges(base_mask, size, plot=False):
     return edges, smoothed_binary
 
 
-def scale_field_lave(field, clear_mask, edge_mask, ktmean, ktmax=1.4, kt1pct=0.2, max_quant=0.99, plot=True):
+def _scale_field_lave(field, clear_mask, edge_mask, ktmean, ktmax=1.4, kt1pct=0.2, max_quant=0.99, plot=False):
+    """
+    Scale a field of clouds to match a desired mean and distribution of kt values.
+
+    Parameters
+    ----------
+    field : np.ndarray
+        The field of clouds
+    clear_mask : np.ndarray
+        The clear sky mask. Zero indicates cloudy, one indicates clear
+    edge_mask : np.ndarray
+        The edge mask. Zero indicates not an edge, one indicates an edge
+    ktmean : float
+        The desired mean of the kt values
+    ktmax : float
+        The maximum of the kt values
+    kt1pct : float
+        The 1st percentile of the kt values
+    max_quant : float
+        The quantile to use for the maximum of the field
+    plot : bool
+        Whether to plot the results
+
+    Returns
+    -------
+    clouds5 : np.ndarray
+        The scaled field of clouds
+    """
+
 
     # ##### Shift values of kt to range from 0.2 - 1
 
@@ -293,7 +291,6 @@ def scale_field_lave(field, clear_mask, edge_mask, ktmean, ktmax=1.4, kt1pct=0.2
     # I think the intent here would be to make it vary between kt1pct and 1, but that's not quite what it does.
     clouds3 = 1 - field*(1-kt1pct)/field_max
 
-
     # # Clip limits to sensible boundaries
     clouds3[clouds3 > 1] = 1
     clouds3[clouds3 < 0] = 0
@@ -305,11 +302,14 @@ def scale_field_lave(field, clear_mask, edge_mask, ktmean, ktmax=1.4, kt1pct=0.2
     ce = 1+ (clouds3/mean_c3-nmin_c3)/nrange_c3*(ktmax-1)
 
     # Rescale one more time to make the mean of clouds3 match the ktmean from the timeseries
-    cloud_mask = np.bitwise_or(clear_mask>0, edge_mask) == 0  # Where is it neither clear nor edge
+    try:
+        cloud_mask = np.bitwise_or(clear_mask>0, edge_mask) == 0  # Where is it neither clear nor edge
+    except TypeError:
+        cloud_mask = np.bitwise_or(clear_mask>0, edge_mask > 0) == 0  # Where is it neither clear nor edge
     tgtsum = field.size * ktmean  # Mean scaled over whole field
     diff_sum = tgtsum - np.sum(clear_mask) - np.sum(ce[np.bitwise_and(edge_mask > 0, clear_mask==0)])  # Shifting target to exclude fully clear values and the cloud enhancement
     tgt_cloud_mean = diff_sum / np.sum(cloud_mask)  # Find average required in areas where it's neither cloud nor edge
-    current_cloud_mean = np.mean(clouds3[cloud_mask]) # Actual cloud mean
+    current_cloud_mean = np.mean(clouds3[cloud_mask]) # Actual cloud mean in field
 
     if diff_sum > 0:
         clouds4 = tgt_cloud_mean / current_cloud_mean * clouds3
@@ -319,7 +319,7 @@ def scale_field_lave(field, clear_mask, edge_mask, ktmean, ktmax=1.4, kt1pct=0.2
     clouds5 = clouds4.copy()
 
     # Edges then clear means that the clearsky overrides the edge enhancement
-    clouds5[edge_mask] = ce[edge_mask > 0]
+    clouds5[edge_mask > 0] = ce[edge_mask > 0]
     clouds5[clear_mask > 0] = 1
     print(f"Desired Mean: {ktmean}, actual global mean {np.mean(clouds5)}.")
 
@@ -343,7 +343,7 @@ def scale_field_lave(field, clear_mask, edge_mask, ktmean, ktmax=1.4, kt1pct=0.2
     return clouds5
 
 
-def get_timeseries_props(kt_ts, clear_threshold=0.95, plot=True):
+def get_timeseries_stats(kt_ts, clear_threshold=0.95, plot=True):
     """
     Get the properties of a time series of kt values.
 
@@ -407,73 +407,112 @@ def get_timeseries_props(kt_ts, clear_threshold=0.95, plot=True):
     return ktmean, kt_1_pct, ktmax, frac_clear, vs, weights, scales
 
 
+def space_to_time(pixres=1, cloud_speed=50):
+
+    # Existing code uses 1 pixel per meter, and divides by cloud speed to get X size
+    # does 3600 pixels, but assumes the clouds move by one full timestep.
+
+    # ECEF coordinate system (Earth Centered Earth Fixed) is used to convert lat/lon to x/y.
+    # This seems really weird. https://en.wikipedia.org/wiki/Geographic_coordinate_conversion
+
+    # [X, Y] = geod2ecef(Lat_to_Sim, Lon_to_Sim, zeros(size(Lat_to_Sim)));
+    # ynorm1 = Y - mean(Y);
+    # xnorm1 = X - mean(X);
+    # ynorm=round((ynorm1-min(ynorm1))./Cloud_Spd(qq))+1;
+    # xnorm=round((xnorm1-min(xnorm1))./Cloud_Spd(qq))+1;
+    # Xsize=60*60+max(xnorm);
+    # Ysize=max(ynorm);
+    # Xsize and Ysize are the pixel sizes generated
+
+    # Extracting a time series has us loop through the entire size of X pixels, and choose a window 3600 pixels wide, and multiply by GHI_cs
+    # GHI_syn(i,hour(datetime2(GHI_timestamp))==h1)=clouds_new{h1}(ynorm(i),xnorm(i):xnorm(i)+3600-1)'.*GHI_clrsky(hour(datetime2(GHI_timestamp))==h1);
+
+    pixjump = cloud_speed / pixres
+    # n space
+    # dx space
+    # velocity
+    # dt = dx / velocity
+    # max space = n * dx
+    # max time = max space / velocity
+
+
+
+def cloudfield_timeseries(weights, scales, size, frac_clear, ktmean, ktmax, kt1pct):
+    cfield = _stack_random_field(weights, scales, size)
+    clear_mask = _stack_random_field(weights, scales, size)
+    clear_mask = _calc_clear_mask(clear_mask, frac_clear)  # 0 is cloudy, 1 is clear
+
+    edges, smoothed = _find_edges(clear_mask, 3)
+
+    field_final = _scale_field_lave(cfield, clear_mask, smoothed, ktmean, ktmax, kt1pct)
+    return field_final
 
 
 if __name__ == '__main__':
 
     import pandas as pd
     import pvlib
+    from solarspatialtools import irradiance
+    from solarspatialtools import cmv
+    from solarspatialtools import spatial
+    np.random.seed(42)  # seed it for repeatability
+
+
+    # #### Load Timeseries Data
 
     datafn = "../../../demos/data/hope_melpitz_1s.h5"
     twin = pd.date_range('2013-09-08 9:15:00', '2013-09-08 10:15:00', freq='1s', tz='UTC')
     data = pd.read_hdf(datafn, mode="r", key="data")
-    data = data[40]
+    data_i = data[40]
     # plt.plot(data)
     # plt.show()
 
     pos = pd.read_hdf(datafn, mode="r", key="latlon")
     loc = pvlib.location.Location(np.mean(pos['lat']), np.mean(pos['lon']))
-    cs_ghi = loc.get_clearsky(data.index, model='simplified_solis')['ghi']
+    cs_ghi = loc.get_clearsky(data_i.index, model='simplified_solis')['ghi']
     cs_ghi = 1000/max(cs_ghi) * cs_ghi  # Rescale (possible scaling on
-    kt = pvlib.irradiance.clearsky_index(data, cs_ghi, 2)
+    kt = pvlib.irradiance.clearsky_index(data_i, cs_ghi, 2)
 
-    # plt.plot(data)
-    # plt.plot(cs_ghi)
-    # plt.show()
-    #
-    # plt.plot(kt)
-    # plt.show()
+    pos_utm = pd.read_hdf(datafn, mode="r", key="utm")
+    e_extent = np.abs(np.max(pos_utm['E'])-np.min(pos_utm['E']))
+    n_extent = np.abs(np.max(pos_utm['N'])-np.min(pos_utm['N']))
+    t_extent = (np.max(twin)-np.min(twin)).total_seconds()
+    dt = (twin[1] - twin[0]).total_seconds()
 
-    # plt.hist(kt, bins=100)
-    # plt.show()
+    kt_all = irradiance.clearsky_index(data, cs_ghi, 2)
+    cld_spd, cld_dir, _ = cmv.compute_cmv(kt_all, pos_utm, reference_id=None, method='jamaly')
+    cld_en = spatial.pol2rect(cld_spd, cld_dir)
 
-    ktmean, kt1pct, ktmax, frac_clear, vs, weights, scales = get_timeseries_props(kt, plot=False)
+    print(f"Cld Speed  {cld_spd:8.2f}, Cld Dir {np.rad2deg(cld_dir):8.2f}")
 
-    print(f"Clear Fraction is: {frac_clear}")
+    spatial_time_x = n_extent/cld_spd
+    spatial_time_y = e_extent/cld_spd
 
-    np.random.seed(42)  # seed it for repeatability
-
-    xsiz = 2**12
-    ysiz = 2**14
-
-    cfield = _stack_random_field(weights, scales, (xsiz, ysiz))
-
-    clear_mask = _stack_random_field(weights, scales, (xsiz, ysiz))
-    clear_mask = _calc_clear_mask(clear_mask, frac_clear, plot=False)  # 0 is cloudy, 1 is clear
+    # This now represents the time to space relationship in seconds, so each pixel represents a 1 second step.
+    # Our steps in X represent 1 second forward or backward in EITHER space or time
+    # Our steps in Y represent 1 "cloud second" left or right perpendicular to the motion axis
+    xt_size = int(np.ceil(spatial_time_x + t_extent))
+    yt_size = int(np.ceil(spatial_time_y))
 
 
-    # Clear Everywhere
-    out_field = np.ones_like(cfield)
-    # Where it's cloudy, mask in the clouds
-    out_field[clear_mask == 0] = cfield[clear_mask == 0]
 
-    # plt.imshow(out_field, extent=(0, ysiz, 0, xsiz))
-    # plt.show()
+    # #### Get Statistics
 
-    edges, smoothed = _find_edges(clear_mask, 3, plot=False)
+    ktmean, kt1pct, ktmax, frac_clear, vs, weights, scales = get_timeseries_stats(kt, plot=False)
 
-    # field_final = shift_mean_lave(out_field, ktmean)
-    field_final = scale_field_lave(cfield, clear_mask, smoothed, ktmean, ktmax, kt1pct, plot=False)
+    # get Field
+    field_final = cloudfield_timeseries(weights, scales, (xsiz, ysiz), frac_clear, ktmean, ktmax, kt1pct)
 
+    # Plot a timeseries
     plt.plot(field_final[1,:])
     plt.show()
 
+    # Compare Hist of CS Index
     plt.hist(kt, bins=50)
     plt.hist(field_final[1,:], bins=50, alpha=0.5)
-    plt.show()
 
+    # Ramp Rate
+    plt.figure()
     plt.hist(np.diff(kt), bins=50)
     plt.hist(np.diff(field_final[1,:]), bins=200, alpha=0.5)
     plt.show()
-
-    # assert np.all(r == rnew)
