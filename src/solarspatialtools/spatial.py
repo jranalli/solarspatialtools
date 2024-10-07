@@ -312,7 +312,9 @@ def rotate_vector(vector, theta):
     Parameters
     ----------
     vector : (x, y) numeric
-        A tuple (or numpy array) containing the input vector
+        A tuple (or numpy array) containing the input vector.
+        To operate on multiple points, vector should be of the form:
+            ((x1, x2, x3, x4), (y1, y2, y3, y4))
 
     theta : numeric
         Angle of rotation in radians
@@ -321,7 +323,8 @@ def rotate_vector(vector, theta):
     -------
     (x, y) : numeric
         A tuple (or numpy array) containing the rotated vector. Matches data
-        type of input.
+        type of input. If input an array of x's and y's, output will be
+        oriented ((x1', x2', x3', x4'), (y1', y2', y3', y4'))
     """
 
     rot_matrix = np.array([[np.cos(theta), -np.sin(theta)],
