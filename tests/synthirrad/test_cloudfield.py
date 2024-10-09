@@ -9,6 +9,7 @@ import pandas as pd
 
 
 class TestFieldGeneration:
+    # TODO add tests for size 1 and size 0 to guarantee that they produce correct output
     def test_random_at_scale_identity(self):
         base, interp = cloudfield._random_at_scale((10,10), (10, 10), False)
         assert base.shape == (10, 10)
