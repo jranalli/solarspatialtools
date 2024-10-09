@@ -30,11 +30,18 @@ def _random_at_scale(rand_size, final_size, plot=False):
     """
 
     # Generate random values at the scale of rand_size
-    random = np.random.rand(rand_size[0], rand_size[1])
+    random = np.random.rand(np.max([rand_size[0],1]), np.max([rand_size[1],1]))
+
+    # If random has any singleton dimensions, repeat it, because interpolation
+    # requires at least 2 points in each dimension
+    if random.shape[0] == 1:
+        random = np.repeat(random, 2, axis=0)
+    if random.shape[1] == 1:
+        random = np.repeat(random, 2, axis=1)
 
     # Linearly interpolate to the final size
-    x = np.linspace(0, 1, rand_size[0])
-    y = np.linspace(0, 1, rand_size[1])
+    x = np.linspace(0, 1, random.shape[0])
+    y = np.linspace(0, 1, random.shape[1])
 
     xnew = np.linspace(0, 1, final_size[0])
     ynew = np.linspace(0, 1, final_size[1])
@@ -144,8 +151,8 @@ def _stack_random_field(weights, scales, size, normalize=False, plot=False):
 
     for scale, weight in zip(scales, weights):
         prop = 2.0**(-scale+1)  # proportion for this scale
-        xsz = np.max([int(size[0]*prop),2])  # min of 2 so that we never go past the limit on interp
-        ysz = np.max([int(size[1]*prop),2])
+        xsz = int(size[0]*prop)
+        ysz = int(size[1]*prop)
         _, i_field = _random_at_scale((xsz, ysz), size)
         field += i_field * weight
 
@@ -331,9 +338,9 @@ def _scale_field_lave(field, clear_mask, edge_mask, ktmean, ktmax=1.4, kt1pct=0.
                     "Original Field Distribution"])
 
         fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-        axs[0].imshow(field, extent=(0, field.shape[0], 0, field.shape[1]))
+        axs[0].imshow(field, extent=(0, field.shape[1], 0, field.shape[0]))
         axs[0].set_title('Original Field')
-        axs[1].imshow(clouds5, extent=(0, field.shape[0], 0, field.shape[1]))
+        axs[1].imshow(clouds5, extent=(0, field.shape[1], 0, field.shape[0]))
         axs[1].set_title('Shifted Field')
         plt.show()
 
@@ -434,7 +441,7 @@ def space_to_time(pixres=1, cloud_speed=50):
 
 
 
-def cloudfield_timeseries(weights, scales, size, frac_clear, ktmean, ktmax, kt1pct):
+def cloudfield_timeseries(weights, scales, size, frac_clear, ktmean, ktmax, kt1pct, edgesmoothing=3):
     """
     Generate a time series of cloud fields based on the properties of a time series of kt values.
 
@@ -454,17 +461,19 @@ def cloudfield_timeseries(weights, scales, size, frac_clear, ktmean, ktmax, kt1p
         The maximum of the kt values
     kt1pct : float
         The 1st percentile of the kt values
+    edgesmoothing : int
+        The size of the uniform filter for edge smoothing
 
     Returns
     -------
     field_final : np.ndarray
         The final field of simulated clouds
     """
-    cfield = _stack_random_field(weights, scales, size)
+    cfield = _stack_random_field(weights, scales, size, plot=False)
     clear_mask = _stack_random_field(weights, scales, size)
-    clear_mask = _calc_clear_mask(clear_mask, frac_clear)  # 0 is cloudy, 1 is clear
+    clear_mask = _calc_clear_mask(clear_mask, frac_clear, plot=False)  # 0 is cloudy, 1 is clear
 
-    edges, smoothed = _find_edges(clear_mask, 3)
+    edges, smoothed = _find_edges(clear_mask, edgesmoothing)
 
     field_final = _scale_field_lave(cfield, clear_mask, smoothed, ktmean, ktmax, kt1pct, plot=True)
     return field_final
@@ -549,17 +558,14 @@ if __name__ == '__main__':
     # Our steps in Y represent 1 "cloud second" left or right perpendicular to the motion axis
     # We actually have to oversize things a bit because if the field is too small, we can't
     # halve its size a sufficient number of times.
-    # TODO rethink this one on the large scales side, are we interpolating for no reason?
-    xt_size = np.max([int(np.ceil(spatial_time_x + t_extent)), 2**len(scales)])
-    # yt_size = np.max([int(np.ceil(spatial_time_y)), 2**len(scales)])
-    # xt_size = int(np.ceil(spatial_time_x + t_extent))
+    xt_size = int(np.ceil(spatial_time_x + t_extent))
     yt_size = int(np.ceil(spatial_time_y))
 
     # Calculate the randomized field
     field_final = cloudfield_timeseries(weights, scales, (xt_size, yt_size), frac_clear, ktmean, ktmax, kt1pct)
 
     # Plot a timeseries
-    plt.plot(field_final[1,:])
+    plt.plot(field_final[:,1:5])
     plt.show()
 
 
@@ -582,7 +588,7 @@ if __name__ == '__main__':
 
     # Compare Hist of CS Index
     plt.hist(kt, bins=50)
-    plt.hist(field_final[:,1], bins=50, alpha=0.5)
+    plt.hist(field_final[1,:], bins=50, alpha=0.5)
 
     # Ramp Rate
     plt.figure()
