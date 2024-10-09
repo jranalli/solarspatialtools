@@ -9,7 +9,6 @@ import pandas as pd
 
 
 class TestFieldGeneration:
-    # TODO add tests for size 1 and size 0 to guarantee that they produce correct output
     def test_random_at_scale_identity(self):
         base, interp = cloudfield._random_at_scale((10,10), (10, 10), False)
         assert base.shape == (10, 10)
@@ -36,6 +35,42 @@ class TestFieldGeneration:
         base, interp = cloudfield._random_at_scale(rand_size, final_size)
         # Check that the interpolated values are within the range of the original values
         assert interp.min() >= base.min() and interp.max() <= base.max()
+
+    def test_random_at_scale_size1(self):
+        rand_size = (1, 1)
+        final_size = (20, 20)
+        base, interp = cloudfield._random_at_scale(rand_size, final_size)
+        assert np.mean(base) == approx(base[0, 0])
+        assert interp.shape == final_size
+
+    def test_random_at_scale_size_partial1(self):
+        rand_size = (10, 1)
+        final_size = (20, 20)
+        base, interp = cloudfield._random_at_scale(rand_size, final_size)
+        assert interp.shape == final_size
+
+        rand_size = (1, 10)
+        final_size = (20, 20)
+        base, interp = cloudfield._random_at_scale(rand_size, final_size)
+        assert interp.shape == final_size
+
+    def test_random_at_scale_size0(self):
+        rand_size = (0, 0)
+        final_size = (20, 20)
+        base, interp = cloudfield._random_at_scale(rand_size, final_size)
+        assert np.mean(base) == approx(base[0, 0])
+        assert interp.shape == final_size
+
+    def test_random_at_scale_size_partial0(self):
+        rand_size = (10, 0)
+        final_size = (20, 20)
+        base, interp = cloudfield._random_at_scale(rand_size, final_size)
+        assert interp.shape == final_size
+
+        rand_size = (0, 10)
+        final_size = (20, 20)
+        base, interp = cloudfield._random_at_scale(rand_size, final_size)
+        assert interp.shape == final_size
 
     def test_stack_random_field_with_weights(self):
         size = (100, 100)
