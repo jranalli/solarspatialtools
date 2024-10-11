@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
-# from scipy.ndimage import map_coordinates
+
+import pvlib
 
 import matplotlib.pyplot as plt
 from scipy.ndimage import sobel, uniform_filter
@@ -377,7 +378,6 @@ def get_timeseries_stats(kt_ts, clear_threshold=0.95, plot=False):
     scales : list
         The timescales of the wavelets
     """
-    import pvlib
 
     # Get the mean and standard deviation of the time series
     ktmean = np.mean(kt_ts)  # represents mean of kt
