@@ -14,7 +14,7 @@ np.random.seed(42)  # seed it for repeatability
 
 # #### Load Timeseries Data
 
-datafn = "../../../demos/data/hope_melpitz_1s.h5"
+datafn = "data/hope_melpitz_1s.h5"
 twin = pd.date_range('2013-09-08 9:15:00', '2013-09-08 10:15:00', freq='1s', tz='UTC')
 data = pd.read_hdf(datafn, mode="r", key="data")
 data_i = data[40]
