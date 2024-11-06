@@ -216,7 +216,7 @@ def _calc_clear_mask(field, clear_frac=0.5, plot=False):
 
     return field_mask
 
-def _find_edges(base_mask, size, plot=False):
+def _find_edges(base_mask, size, binarize_threshold=0, plot=False):
     """
     Find the edges of a mask using a Sobel filter and then broadens it with a uniform filter.
 
@@ -226,6 +226,10 @@ def _find_edges(base_mask, size, plot=False):
         The mask to find the edges of
     size : int
         The size of the uniform filter (effectively doubles the size of the filter.
+    binarize_threshold : float
+        The lower threshold to binarize the smoothed mask. Increase to reduce
+        the overall coverage of the edges, e.g. for highly sparse areas. Scaled
+        as a percentage of the smoothed mask dynamic range.
 
     Returns
     -------
@@ -242,24 +246,24 @@ def _find_edges(base_mask, size, plot=False):
     # We want to binarize it
     smoothed[smoothed < 1e-5] = 0  # Zero out the small floating point values
     # Calculate a threshold based on quantile, because otherwise we get the whole clouds
-    smoothed_binary = smoothed > 0
+    smoothed_binary = smoothed/np.max(smoothed) > binarize_threshold
 
     if plot:
         xsiz, ysiz = base_mask.shape
         # Compare the edges and uniform filtered edges side by side
         fig, axs = plt.subplots(1, 3, figsize=(10, 5))
-        axs[0].imshow(edges, extent=(0, ysiz, 0, xsiz))
-        axs[0].set_title('Edges')
-        axs[1].imshow(smoothed_binary, extent=(0, ysiz, 0, xsiz))
-        axs[1].set_title('Uniform Filtered Edges')
-        axs[2].imshow(base_mask, extent=(0, ysiz, 0, xsiz))
-        axs[2].set_title('Original Mask')
+        axs[0].imshow(base_mask, extent=(0, ysiz, 0, xsiz))
+        axs[0].set_title('Original Mask')
+        axs[1].imshow(edges, extent=(0, ysiz, 0, xsiz))
+        axs[1].set_title('Edges')
+        axs[2].imshow(smoothed_binary, extent=(0, ysiz, 0, xsiz))
+        axs[2].set_title('Uniform Filtered Edges')
         plt.show()
 
     return edges, smoothed_binary
 
 
-def _scale_field_lave(field, clear_mask, edge_mask, ktmean, ktmax=1.4, kt1pct=0.2, max_quant=0.99, plot=False):
+def _scale_field(field, clear_mask, edge_mask, ktmean, ktmax=1.4, kt1pct=0.2, max_quant=0.99, method='original', plot=False):
     """
     Scale a field of clouds to match a desired mean and distribution of kt values.
 
@@ -279,6 +283,10 @@ def _scale_field_lave(field, clear_mask, edge_mask, ktmean, ktmax=1.4, kt1pct=0.
         The 1st percentile of the kt values
     max_quant : float
         The quantile to use for the maximum of the field
+    method : str
+        The method to use for scaling the field.
+        - 'original' follows the method by the original author
+        - 'basic' follows a simpler method that matches the mean and max
     plot : bool
         Whether to plot the results
 
@@ -289,60 +297,137 @@ def _scale_field_lave(field, clear_mask, edge_mask, ktmean, ktmax=1.4, kt1pct=0.
     """
 
 
-    # ##### Shift values of kt to range from 0.2 - 1
+    if method == 'original':
+        # ##### Shift values of kt to range from 0.2 - 1
 
-    # Calc the "max" and "min", excluding clear values
-    field_max = np.quantile(field[clear_mask == 0], max_quant)
+        # Calc the "max" and "min", excluding clear values
+        field_max = np.quantile(field[clear_mask == 0], max_quant)
 
-    # Create a flipped version of the distribution that scales between slightly below kt1pct and bascially (1-field_min)
-    # I think the intent here would be to make it vary between kt1pct and 1, but that's not quite what it does.
-    clouds3 = 1 - field*(1-kt1pct)/field_max
+        # Create a flipped version of the distribution that scales between
+        # slightly below kt1pct and bascially (1-field_min). I think the intent
+        # here would be to make it vary between kt1pct and 1, but that's not
+        # quite what it does.
+        clouds3 = 1 - field*(1-kt1pct)/field_max
 
-    # # Clip limits to sensible boundaries
-    clouds3[clouds3 > 1] = 1
-    clouds3[clouds3 < 0] = 0
+        # # Clip limits to sensible boundaries
+        clouds3[clouds3 > 1] = 1
+        clouds3[clouds3 < 0] = 0
 
-    # ##### Apply multiplier to shift mean to ktmean #####
-    mean_c3 = np.mean(clouds3)
-    nmin_c3 = np.min(clouds3)/mean_c3
-    nrange_c3 = np.max(clouds3)/mean_c3-nmin_c3
-    ce = 1+ (clouds3/mean_c3-nmin_c3)/nrange_c3*(ktmax-1)
+        # ##### Calculate the cloud edge distribution #####
+        ce = 1 + (clouds3 - np.min(clouds3)) / (np.max(clouds3) - np.min(clouds3)) * (ktmax - 1)
 
-    # Rescale one more time to make the mean of clouds3 match the ktmean from the timeseries
-    try:
-        cloud_mask = np.bitwise_or(clear_mask>0, edge_mask) == 0  # Where is it neither clear nor edge
-    except TypeError:
-        cloud_mask = np.bitwise_or(clear_mask>0, edge_mask > 0) == 0  # Where is it neither clear nor edge
-    tgtsum = field.size * ktmean  # Mean scaled over whole field
-    diff_sum = tgtsum - np.sum(clear_mask) - np.sum(ce[np.bitwise_and(edge_mask > 0, clear_mask==0)])  # Shifting target to exclude fully clear values and the cloud enhancement
-    tgt_cloud_mean = diff_sum / np.sum(cloud_mask)  # Find average required in areas where it's neither cloud nor edge
-    current_cloud_mean = np.mean(clouds3[cloud_mask]) # Actual cloud mean in field
+        # Calculate a scaling factor on the cloudy region, to make it match the
+        # specified ktmean from the timeseries
+        try:
+            # Where is it neither clear nor edge
+            cloud_mask = np.bitwise_or(clear_mask > 0, edge_mask) == 0
+        except TypeError:
+            # Where is it neither clear nor edge
+            cloud_mask = np.bitwise_or(clear_mask > 0, edge_mask > 0) == 0
 
-    if diff_sum > 0:
-        clouds4 = tgt_cloud_mean / current_cloud_mean * clouds3
+        # Mean scaled over whole field
+        tgtsum = field.size * ktmean
+
+        # Shifting target to exclude fully clear vals and the cloud enhancement
+        diff_sum = (tgtsum
+                    - np.sum(clear_mask)
+                    - np.sum(ce[np.bitwise_and(edge_mask > 0, clear_mask==0)]))
+
+        # Find average required in areas where it's neither cloud nor edge
+        tgt_cloud_mean = diff_sum / np.sum(cloud_mask)
+
+        # Actual current cloud mean in the field
+        current_cloud_mean = np.mean(clouds3[cloud_mask])
+
+        # Only do this scaling if we have a positive difference
+        if diff_sum > 0:
+            clouds4 = tgt_cloud_mean / current_cloud_mean * clouds3
+        else:
+            clouds4 = clouds3.copy()
+
+        clouds5 = clouds4.copy()
+
+        # Mask in edges and clear. Order matters. By doing clear second,
+        # we ensure that the clear sky is respected over the edge mask
+        clouds5[edge_mask > 0] = ce[edge_mask > 0]
+        clouds5[clear_mask > 0] = 1
+    elif method == 'basic':
+        flip_distribution = True
+        clearsky_distr_range = 0.6
+
+        field_max = np.quantile(field[clear_mask == 0], 0.999)
+        field_min = np.quantile(field[clear_mask == 0], .001)
+
+        # cloud field with max and min percentiles running from 0 - 1
+        clouds_fr = (field - field_min) / (field_max - field_min)
+
+        # Rather than clipping, we'll reflect the portions outside the range
+        clouds_fr[clouds_fr > 1] = 2 - clouds_fr[clouds_fr > 1]
+        clouds_fr[clouds_fr < 0] = -clouds_fr[clouds_fr < 0]
+
+        if flip_distribution:
+            # flip the distribution so that it runs from 1 to 0
+            clouds_fr = 1 - clouds_fr
+
+        # create a cloud enhancement field that scales from 1 to ktmax
+        ce = clouds_fr * (ktmax - 1) + 1
+
+        # calculate the cloud mask
+        cloud_mask = np.bitwise_or(clear_mask > 0, edge_mask > 0) == 0
+
+        # Create a placeholder
+        clouds5 = np.zeros_like(field)
+        # copy in the edges
+        clouds5[edge_mask > 0] = ce[edge_mask > 0]
+        # copy in the clear sky
+        if clearsky_distr_range is not None:
+            clouds5[clear_mask > 0] = clouds_fr[clear_mask > 0] * (1 - clearsky_distr_range) + clearsky_distr_range
+        else:
+            clouds5[clear_mask > 0] = 1
+
+        # calculate the required sum of the cloudy region
+        tgtsum = field.size * ktmean
+        tgt_cloud_sum = tgtsum - np.sum(clouds5)
+
+        # Subtract off the baseline of the minimum kt
+        baseline_sum = kt1pct * np.sum(cloud_mask)
+        tgt_cloud_sum = tgt_cloud_sum - baseline_sum
+
+        # Calculate the current sum of the cloudy region and scale if
+        # appropriate. We don't want to scale up because the clouds would
+        # exceed kt = 1.
+        current_cloud_sum = np.sum(clouds_fr[cloud_mask])
+
+
+        if tgt_cloud_sum > 0 and current_cloud_sum > baseline_sum and tgt_cloud_sum < current_cloud_sum:
+            clouds5[cloud_mask] = clouds_fr[cloud_mask] * tgt_cloud_sum / current_cloud_sum + kt1pct
+        else:
+            print("Warning! Can't match desired statistics.")
+            # convert clouds_fr to run from kt1pct to 1 and assign values
+            clouds5[cloud_mask] = clouds_fr[cloud_mask] * (1 - kt1pct) + kt1pct
     else:
-        clouds4 = clouds3.copy()
-
-    clouds5 = clouds4.copy()
-
-    # Edges then clear means that the clearsky overrides the edge enhancement
-    clouds5[edge_mask > 0] = ce[edge_mask > 0]
-    clouds5[clear_mask > 0] = 1
+        raise ValueError(f"Method: '{method}' not recognized.")
 
     if plot:
-        plt.hist(ce.flatten(), bins=100)
-        plt.hist(clouds3.flatten(), bins=100, alpha=0.5)
-        plt.hist(clouds4.flatten(), bins=100, alpha=0.5)
-        plt.hist(clouds5.flatten(), bins=100, alpha=0.5)
-        plt.hist(field.flatten(), bins=100, alpha=0.5)
-        plt.legend(["Cloud Enhancement", "1st Scaled Cloud Distribution", "2nd Scaled Cloud Distribution", "Fully Remapped Distribution",
-                    "Original Field Distribution"])
+        # plt.hist(ce.flatten(), bins=100)
+        # plt.hist(clouds3.flatten(), bins=100, alpha=0.5)
+        # plt.hist(clouds4.flatten(), bins=100, alpha=0.5)
+        # plt.hist(clouds5.flatten(), bins=100, alpha=0.5)
+        # plt.hist(field.flatten(), bins=100, alpha=0.5)
+        # plt.legend(["Cloud Enhancement", "1st Scaled Cloud Distribution", "2nd Scaled Cloud Distribution", "Fully Remapped Distribution",
+        #             "Original Field Distribution"])
+        plt.hist(clouds5.flatten()[clouds5.flatten()<1], bins=100, alpha=0.5)
+        plt.hist(clouds5.flatten()[clouds5.flatten()==1], bins=100, alpha=0.5)
+        plt.hist(clouds5.flatten()[clouds5.flatten()>1], bins=100, alpha=0.5)
+        plt.legend(["Cloudy Area", "Clear Sky", "Edge Enhancement"])
+        plt.ylabel('Frequency')
+        plt.xlabel('kt')
 
         fig, axs = plt.subplots(1, 2, figsize=(10, 5))
         axs[0].imshow(field, extent=(0, field.shape[1], 0, field.shape[0]))
         axs[0].set_title('Original Field')
         axs[1].imshow(clouds5, extent=(0, field.shape[1], 0, field.shape[0]))
-        axs[1].set_title('Shifted Field')
+        axs[1].set_title('Scaled Field w/ Cloud Enhancement')
         plt.show()
 
     return clouds5
@@ -477,5 +562,5 @@ def cloudfield_timeseries(weights, scales, size, frac_clear, ktmean, ktmax, kt1p
 
     edges, smoothed = _find_edges(clear_mask, edgesmoothing)
 
-    field_final = _scale_field_lave(cfield, clear_mask, smoothed, ktmean, ktmax, kt1pct, plot=False)
+    field_final = _scale_field(cfield, clear_mask, smoothed, ktmean, ktmax, kt1pct, plot=False)
     return field_final

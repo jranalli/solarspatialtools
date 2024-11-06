@@ -176,7 +176,7 @@ class TestFieldProcessing:
         ktmean = 0.5
         ktmax = 1.08
         kt1pct = 0.2
-        result = cloudfield._scale_field_lave(field, clear_mask, edge_mask, ktmean, ktmax, kt1pct)
+        result = cloudfield._scale_field(field, clear_mask, edge_mask, ktmean, ktmax, kt1pct)
         assert result.shape == field.shape
         assert np.isclose(np.mean(result), ktmean, atol=0.01)
 
