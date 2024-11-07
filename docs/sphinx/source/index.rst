@@ -26,6 +26,8 @@ The :mod:`solarspatialtools.cmv` module contains functions for calculating the c
 
 The :mod:`solarspatialtools.field` module contains functions for validating the layout of a PV plant or measurement network by calculating the relative delays between each sensor in the network subject to cloud motion.
 
+The :mod:`solarspatialtools.synthirrad` package contains functions for downscaling and generation of synthetic irradiance timeseries.
+
 The best starting point is to read through the :ref:`cmv-examples` and :ref:`field-examples` sections to see some sample Jupyter notebooks that demonstrate how these functions can be used in practice.
 
 
@@ -38,6 +40,7 @@ Contents
 
    cmv
    field
+   synthirrad
    othermods
 
 .. toctree::

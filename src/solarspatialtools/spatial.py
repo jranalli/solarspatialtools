@@ -314,7 +314,7 @@ def rotate_vector(vector, theta):
     vector : (x, y) numeric
         A tuple (or numpy array) containing the input vector.
         To operate on multiple points, vector should be of the form:
-            ((x1, x2, x3, x4), (y1, y2, y3, y4))
+        ((x1, x2, x3, x4), (y1, y2, y3, y4))
 
     theta : numeric
         Angle of rotation in radians

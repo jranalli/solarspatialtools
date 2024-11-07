@@ -570,9 +570,15 @@ def get_positional_ts(tgt_position, field, cloud_speed, duration=3600, pixres=1)
 
 
 
-def cloudfield_timeseries(weights, scales, size, frac_clear, ktmean, ktmax, kt1pct, edgesmoothing=3):
+def cloudfield_timeseries(weights, scales, size, frac_clear, ktmean, ktmax, kt1pct, scaling='original', edgesmoothing=3):
     """
-    Generate a time series of cloud fields based on the properties of a time series of kt values.
+    Generate a time series of cloud fields based on the properties of a time series of kt values. This is an
+    implementation of the method described by Lave et al [1]. Some aspects of the implementation diverge slightly from
+    the initial paper to follow a subsequent code implementation of the method shared by the original authors.
+
+    [1] Matthew Lave, Matthew J. Reno, Robert J. Broderick, "Creation and Value of Synthetic High-Frequency Solar Inputs
+    for Distribution System QSTS Simulations," 2017 IEEE 44th Photovoltaic Specialist Conference (PVSC),
+    Washington, DC, USA, 2017, pp. 3031-3033, doi: https://dx.doi.org/10.1109/PVSC.2017.8366378.
 
     Parameters
     ----------
@@ -590,6 +596,8 @@ def cloudfield_timeseries(weights, scales, size, frac_clear, ktmean, ktmax, kt1p
         The maximum of the kt values
     kt1pct : float
         The 1st percentile of the kt values
+    scaling : str
+        The scaling method to use. Either 'original' or 'basic'
     edgesmoothing : int
         The size of the uniform filter for edge smoothing
 
@@ -604,5 +612,11 @@ def cloudfield_timeseries(weights, scales, size, frac_clear, ktmean, ktmax, kt1p
 
     edges, smoothed = _find_edges(clear_mask, edgesmoothing)
 
-    field_final = _scale_field_lave(cfield, clear_mask, smoothed, ktmean, ktmax, kt1pct, plot=False)
+    if scaling == 'original':
+        field_final = _scale_field_lave(cfield, clear_mask, edges, ktmean, ktmax, kt1pct, plot=False)
+    elif scaling == 'basic':
+        field_final = _scale_field_basic(cfield, clear_mask, smoothed, ktmean, ktmax, kt1pct, plot=False)
+    else:
+        raise ValueError("Scaling method must be either 'original' or 'basic'.")
+
     return field_final
