@@ -65,6 +65,10 @@ might be useful for these analyses. Right now this only contains a function
 for decorating the frequency axis of plots with common timescales. This is an 
 area that could use some expansion in the future.
 
+```synthirrad```  
+Tools for generating synthetic irradiance timeseries and performing downscaling
+operations on time series data. 
+
 ```demos```  
 Data and demonstration codes (including as jupyter notebooks) that demonstrate 
 the functionality of the package. An explanation for the included data is 
