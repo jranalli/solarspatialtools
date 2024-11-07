@@ -10,12 +10,16 @@ project = 'solarspatialtools'
 copyright = '2024, Joe Ranalli'
 author = 'Joe Ranalli'
 
-release = '0.4'
-version = '0.4.5'
-
 import os
 import sys
+import configparser
 sys.path.insert(0, os.path.abspath(os.path.join('..', '..', '..', 'src')))
+
+config_fn = os.path.abspath(os.path.join('..', '..', '..', 'setup.cfg'))
+parser = configparser.RawConfigParser()
+parser.read(config_fn)
+version = parser.get('metadata', 'version')
+release = version
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

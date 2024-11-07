@@ -399,6 +399,11 @@ def test_rotate_vector_numpy():
     assert r1 == approx([0, np.sqrt(2)])
 
 
+def test_rotate_vector_multiple():
+    r1 = spatial.rotate_vector(np.array([[1, 0, 1], [0, 1, 1]]), np.deg2rad(90))
+    assert r1 == approx(np.array([[0, -1, -1], [1, 0, 1]]))
+
+
 def test_project_points(projected_dxdy, projected_dists):
     vecs = projected_dists.keys()
     for vec in vecs:

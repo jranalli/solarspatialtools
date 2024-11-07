@@ -21,6 +21,16 @@ Field Analysis Examples
    demos/field_demo_detailed
    demos/field_reassignment_demo
 
+.. _synthirrad-examples:
+
+Synthetic Irradiance Examples
+-----------------------------
+
+.. toctree::
+   :maxdepth: 1
+
+   demos/synthetic_clouds_demo
+
 Other Examples
 --------------
 

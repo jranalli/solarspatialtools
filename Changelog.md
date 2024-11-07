@@ -74,3 +74,7 @@ site itself.
 - Updating dependencies  and test targets
 - Fix deprecation warnings raised by numpy
 - JOSS publication
+# Version 0.5.1 - Nov 7, 2024
+- Create `synthirrad` package
+- Implement the `synthirrad.cloudfield` module
+- Tests and demos for the new package
