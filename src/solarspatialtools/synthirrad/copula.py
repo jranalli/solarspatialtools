@@ -1,5 +1,8 @@
 import numpy as np
+import pandas as pd
 from sklearn.mixture import GaussianMixture
+
+from solarspatialtools import spatial
 
 # [1] Widen, J. and Munkhammar, J., "Spatio-Temporal Downscaling of Hourly Solar irradiance Data Using Gaussian Copulas," 2019 IEEE 46th Photovoltaic Specialists Conference (PVSC), Chicago, IL, USA, 2019, pp. 3172-3178, doi: 10.1109/PVSC40753.2019.8980922.
 
@@ -61,6 +64,22 @@ def _gaussianMixtureDistribution(csi, meanCSI, params, debug=False):
 
     return gm, pdf_val
 
+def _exponential_decay_parameter(mean_csi, p):
+    k = p * mean_csi * (1-mean_csi)
+    if k < 10**-5:
+        k = 10**-5
+    return k
+
+def _space_time_copula(N, sites, times, csi, cdf, funchand, p, cs, cd):
+    xref, yref, _ = spatial.latlon2utm(sites[0][0], sites[1][0])
+    a = spatial.latlon2utm(sites[0], sites[1])
+    x = a[:,0] - xref
+    y = a[:,1] - yref
+
+    t0 = times[0]
+    dur = times-t0
+    X = 
+
 if __name__ == "__main__":
     param = {
         'comp': [
@@ -82,10 +101,38 @@ if __name__ == "__main__":
             0.1997,
             5.0919,
             0.3863
-        ]
+        ],
+        'corr_quadr': 0.0043
     }
 
+    # Cloud speed and direction in radians
+    cs = np.array([5, 5, 5, 5, 5, 5])
+    cd = np.array([90, 90, 90, 90, 90, 90]) * 2 * np.pi / 360
+
+    # Hourly clearsky
+    hcsi = np.array([0.52,0.71,0.5,0.84,0.63,0.11])
+
+    # lat
+    lat = np.array([21.31236, 21.31303, 21.32357])
+    lon = np.array([-158.08463, -158.08505, -158.08424])
+
+    times = pd.date_range(start='2024-01-01 00:00:00', end='2024-01-01 00:59:59', freq='15s')
+
+    # Loop
+    i = 0
+
     csi = np.arange(-2, 2, 0.01)
+    mean_csi = hcsi[i]
 
-    _gaussianMixtureDistribution(csi, 0.52, param, True)
+    gm, pdf = _gaussianMixtureDistribution(csi, mean_csi, param, True)
+    cdf = np.cumsum(pdf) * (csi[1] - csi[0])
 
+    import matplotlib.pyplot as plt
+    plt.plot(csi, cdf)
+    plt.show()
+
+    fun = lambda x, d: np.exp(-p * d)
+    p = _exponential_decay_parameter(mean_csi, param['corr_quadr'])
+    print(p)
+
+    _space_time_copula(1, (lat, lon), times, csi, cdf, fun, p, cs[i], cd[i])
