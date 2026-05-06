@@ -309,7 +309,7 @@ def test_averaged_psd_multi():
     x3 = 0.5 * np.sin(2 * np.pi * 2 * t) + np.random.random(len(t))
     x4 = 0.5 * np.sin(2 * np.pi * 2 * t) + np.random.random(len(t))
 
-    xs = [x1, x2, x3, x4]
+    xs = np.array([x1, x2, x3, x4])
     tsigs = [pd.Series(x, index=pd.to_timedelta(t, 's')) for x in xs]
     tsigs_df = pd.DataFrame(np.array(tsigs).T, columns=[0, 1, 2, 3], index=tsigs[0].index)
     navgs = 5
