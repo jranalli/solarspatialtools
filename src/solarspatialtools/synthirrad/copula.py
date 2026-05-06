@@ -78,7 +78,7 @@ def _space_time_copula(N, sites, times, csi, cdf, funchand, p, cs, cd):
 
     t0 = times[0]
     dur = times-t0
-    X = 
+    X = 0
 
 if __name__ == "__main__":
     param = {

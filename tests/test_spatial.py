@@ -95,17 +95,17 @@ def test_latlon2utm_failure(olat, olon):
 
 def test_latlon2utm_arrayin(olat, olon):
     # Value compared with MATLAB known good numbers
-    latarray = np.array([olat, olat, olat])
-    lonarray = np.array([olon, olon, olon])
+    latarray = np.array([olat, olat, olat, olat])
+    lonarray = np.array([olon, olon, olon, olon])
     enlist = spatial.latlon2utm(latarray, lonarray)
     for EN in enlist:
         assert(EN[0], EN[1]) == approx((447464.9005, 5888516.6988))
 
 
 def test_latlon2utm_pandas(olat, olon):
-    latarray = np.array([olat, olat, olat])
-    lonarray = np.array([olon, olon, olon])
-    ind = [1, 2, 3]
+    latarray = np.array([olat, olat, olat, olat])
+    lonarray = np.array([olon, olon, olon, olon])
+    ind = [1, 2, 3, 4]
     latseries = pd.Series(latarray, index=ind)
     lonseries = pd.Series(lonarray, index=ind)
     enframe = spatial.latlon2utm(latseries, lonseries)
@@ -279,6 +279,26 @@ def test_latlon2lcs_shift(olat, olon, dlat, dlon):
     (E, N) = spatial.latlon2lcs(olat - dlat, olon - dlon, olat, olon, zone=32)
     assert -41 < E < -39
     assert -41 < N < -39
+
+
+def test_latlon2lcs_array_shift(olat, olon, dlat, dlon):
+    ind = [1,2,3,4]
+    lat_arr = np.array([olat + dlat, olat + dlat, olat + dlat, olat + dlat])
+    lon_arr = np.array([olon + dlon, olon + dlon, olon + dlon, olon + dlon])
+    (E, N) = spatial.latlon2lcs(lat_arr, lon_arr, olat, olon)
+    for ei, ni in zip(E, N):
+        assert 39 < ei < 41
+        assert 39 < ni < 41
+
+
+def test_latlon2lcs_pandas_shift(olat, olon, dlat, dlon):
+    ind = [1,2,3,4]
+    lat_arr = pd.Series([olat + dlat, olat + dlat, olat + dlat, olat + dlat], index=ind)
+    lon_arr = pd.Series([olon + dlon, olon + dlon, olon + dlon, olon + dlon], index=ind)
+    E, N = spatial.latlon2lcs(lat_arr, lon_arr, olat, olon)
+    for ei, ni in zip(E, N):
+        assert 39 < ei < 41
+        assert 39 < ni < 41
 
 
 def test_lcs2latlon_origin(olat, olon):

@@ -148,8 +148,25 @@ def latlon2lcs(lat, lon, origin_lat, origin_lon, zone=None):
         The Easting and Northing of the target point in the LCS coordinates
     """
     # Convert both coordinates to UTM
-    e_i, n_o, _ = latlon2utm(origin_lat, origin_lon, zone=zone)
-    e_t, n_t, _ = latlon2utm(lat, lon, zone=zone)
+    utm_i = latlon2utm(origin_lat, origin_lon, zone=zone)
+    utm_t = latlon2utm(lat, lon, zone=zone)
+
+    # Extract E and N from results (handle scalar, array, and DataFrame returns)
+    if isinstance(utm_i, pd.DataFrame):
+        e_i, n_o = utm_i['E'], utm_i['N']
+    else:
+        if np.ndim(utm_i) == 1:
+            e_i, n_o, _ = utm_i
+        else:
+            e_i, n_o = utm_i[:, 0], utm_i[:, 1]
+
+    if isinstance(utm_t, pd.DataFrame):
+        e_t, n_t = utm_t['E'], utm_t['N']
+    else:
+        if np.ndim(utm_t) == 1:
+            e_t, n_t, _ = utm_t
+        else:
+            e_t, n_t = utm_t[:, 0], utm_t[:, 1]
 
     # Shift by origin to convert to LCS
     # (LCS is UTM, re-zeroed to the origin's coordinates)

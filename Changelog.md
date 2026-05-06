@@ -81,3 +81,4 @@ site itself.
 # Version 0.5.2 - TBD
 - Implement the synthirrad.copula module
 - Tests and demos for the new package
+- Bugfix - `spatial.latlon2lcs` was not handling arrays
