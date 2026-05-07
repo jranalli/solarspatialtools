@@ -119,10 +119,8 @@ def inverse_sample(x, cdf, r):
     else:
         xu = x[inds].astype(float, copy=True)
         Fxu = Fxu.astype(float, copy=True)
-        xu[0] = -2.0
-        xu[-1] = 2.0
-        Fxu[0] = -99999.0
-        Fxu[-1] = 99999.0
+        xu = np.concatenate([[-2.0], xu, [2.0]])
+        Fxu = np.concatenate([[-99999.0], Fxu, [99999.0]])
 
     r_arr = np.asarray(r, dtype=float)
     s = np.interp(r_arr.reshape(-1), Fxu, xu)
