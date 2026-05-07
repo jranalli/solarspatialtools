@@ -3,6 +3,7 @@ import pandas as pd
 from sklearn.mixture import GaussianMixture
 
 from solarspatialtools import spatial
+from scipy.stats import norm
 
 # [1] Widen, J. and Munkhammar, J., "Spatio-Temporal Downscaling of Hourly Solar irradiance Data Using Gaussian Copulas," 2019 IEEE 46th Photovoltaic Specialists Conference (PVSC), Chicago, IL, USA, 2019, pp. 3172-3178, doi: 10.1109/PVSC40753.2019.8980922.
 
@@ -71,14 +72,73 @@ def _exponential_decay_parameter(mean_csi, p):
     return k
 
 def _space_time_copula(N, sites, times, csi, cdf, funchand, p, cs, cd):
-    xref, yref, _ = spatial.latlon2utm(sites[0][0], sites[1][0])
-    a = spatial.latlon2utm(sites[0], sites[1])
-    x = a[:,0] - xref
-    y = a[:,1] - yref
+    xref, yref = spatial.latlon2lcs(sites[0], sites[1], sites[0][0], sites[1][0])
+    xref, yref = spatial.lla2flat(sites[0], sites[1], sites[0][0], sites[1][0])
 
     t0 = times[0]
-    dur = times-t0
-    X = 0
+    dur = (times-t0).total_seconds().values
+
+    # Build a time-dependent drift term and broadcast against site coordinates.
+    x_drift = np.asarray(cs) * dur * np.sin(np.asarray(cd))
+    y_drift = np.asarray(cs) * dur * np.cos(np.asarray(cd))
+
+    X = np.asarray(xref)[:, None] - np.asarray(x_drift)[None, :]
+    Y = np.asarray(yref)[:, None] - np.asarray(y_drift)[None, :]
+    X = X.T
+    Y = Y.T
+
+    x = np.asarray(X).reshape(-1, order='F')
+    y = np.asarray(Y).reshape(-1, order='F')
+    dx = x[:, None] - x[None, :]
+    dy = y[:, None] - y[None, :]
+    D = np.sqrt(dx**2 + dy**2)
+
+    C = funchand(p, D)
+
+    U = copularnd_gaussian(C, N)
+
+    CSI = inverse_sample(csi, cdf, U)
+    CSI = CSI.reshape(N, times.shape[0], sites[0].shape[0])
+    return CSI
+
+def inverse_sample(x, cdf, r):
+    x = np.asarray(x, dtype=float).reshape(-1)
+    cdf = np.asarray(cdf, dtype=float).reshape(-1)
+
+    if x.size == 0 or cdf.size == 0:
+        raise ValueError("x and cdf must be non-empty.")
+    if x.size != cdf.size:
+        raise ValueError("x and cdf must have the same length.")
+
+    # MATLAB-style unique(cdf) with indices used to subset x.
+    Fxu, inds = np.unique(cdf, return_index=True)
+
+    if Fxu.size == 1:
+        Fxu = np.array([-99999.0, 99999.0])
+        xu = np.array([-2.0, 2.0])
+    else:
+        xu = x[inds].astype(float, copy=True)
+        Fxu = Fxu.astype(float, copy=True)
+        xu[0] = -2.0
+        xu[-1] = 2.0
+        Fxu[0] = -99999.0
+        Fxu[-1] = 99999.0
+
+    r_arr = np.asarray(r, dtype=float)
+    s = np.interp(r_arr.reshape(-1), Fxu, xu)
+
+    if r_arr.ndim == 0:
+        return float(s[0])
+    return s.reshape(r_arr.shape)
+
+
+def copularnd_gaussian(C, N, random_state=None):
+
+    rng = np.random.default_rng(random_state)
+    d = C.shape[0]
+    z = rng.multivariate_normal(mean=np.zeros(d), cov=C, size=N)
+    U = norm.cdf(z)
+    return U
 
 if __name__ == "__main__":
     param = {
@@ -118,21 +178,55 @@ if __name__ == "__main__":
 
     times = pd.date_range(start='2024-01-01 00:00:00', end='2024-01-01 00:59:59', freq='15s')
 
+    noneg = True
+    scale = True
+
+    c = []
+
     # Loop
-    i = 0
+    for i in range(len(hcsi)):
 
-    csi = np.arange(-2, 2, 0.01)
-    mean_csi = hcsi[i]
+        csi = np.arange(-2, 2, 0.01)
+        mean_csi = hcsi[i]
 
-    gm, pdf = _gaussianMixtureDistribution(csi, mean_csi, param, True)
-    cdf = np.cumsum(pdf) * (csi[1] - csi[0])
+        gm, pdf = _gaussianMixtureDistribution(csi, mean_csi, param, debug=False)
+        cdf = np.cumsum(pdf) * (csi[1] - csi[0])
+
+        # Skip matplotlib for now
+        # import matplotlib.pyplot as plt
+        # plt.plot(csi, cdf)
+        # plt.show()
+
+        fun = lambda p, d: np.exp(-p * d)
+        p = _exponential_decay_parameter(mean_csi, param['corr_quadr'])
+
+        M = _space_time_copula(1, (lat, lon), times, csi, cdf, fun, p, cs[i], cd[i])
+
+        cm = M[0,:,:]
+
+        if noneg:
+            cm[cm<0] = 0
+
+        if scale:
+            m = np.mean(cm)
+            scaling_factor = hcsi[i] / m
+            cm *= scaling_factor
+
+        # Collect each segment; we concatenate into one long time series after the loop.
+        c.append(cm)
+
+    c = np.concatenate(c, axis=0)
 
     import matplotlib.pyplot as plt
-    plt.plot(csi, cdf)
+
+    # Build a blocky hourly reference aligned with the high-resolution output.
+    n_per_hour = times.shape[0]
+    hcsi_block = np.repeat(hcsi, n_per_hour)
+
+    plt.plot(c, alpha=0.8)
+    plt.step(np.arange(hcsi_block.size), hcsi_block, where='post', color='k', linewidth=2, label='hcsi (hourly step)')
+    plt.legend()
+
+    plt.figure()
+    plt.hist(c)
     plt.show()
-
-    fun = lambda x, d: np.exp(-p * d)
-    p = _exponential_decay_parameter(mean_csi, param['corr_quadr'])
-    print(p)
-
-    _space_time_copula(1, (lat, lon), times, csi, cdf, fun, p, cs[i], cd[i])

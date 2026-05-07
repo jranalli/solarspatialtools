@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from fontTools.misc.testTools import parseXML
 from pyproj import Proj
 
 
@@ -218,6 +219,54 @@ def lcs2latlon(east, north, origin_lat, origin_lon, zone=None):
     # Calculate
     lat, lon = utm2latlon(e_t, n_t, zone, south)
     return lat, lon
+
+
+def lla2flat(lat, lon, latref, lonref):
+    """
+    Follow algorithm specified by Matlab lla2flat in python [1]
+
+    Parameters
+    ----------
+    lat : numeric
+
+    lon : numeric
+
+    latref : numeric
+
+    lonref : numeric
+
+
+    References
+    ----------
+
+    """
+
+    # # Algorithm provided by aerospace lla2flat implementations:
+    # # [1] https://www.mathworks.com/help/aerotbx/ug/lla2flat.html
+    # # [2] https://engee.com/helpcenter/stable/en/aerospace-axes-transformations/lla-to-flat-earth.html
+    # mu0 = np.deg2rad(latref)
+    # lam0 = np.deg2rad(lonref)
+    #
+    # dmu = np.deg2rad(lat) - mu0
+    # dlam = np.deg2rad(lon) - lam0
+    #
+    # r_earth = 6378137  # WGS84 Earth radius in meters
+    # f = 1/298.257223563  # WGS84 flattening factor
+    #
+    # Rn = r_earth/np.sqrt(1- (2*f-f**2) * np.sin(mu0)**2)
+    # Rm = Rn * ((1 - (2*f - f**2)) / (1 - (2*f-f**2)*np.sin(mu0)**2));
+    #
+    # dN = Rm * dmu
+    # dE = Rn * np.cos(mu0) * dlam
+    #
+    # return dE, dN
+
+    # Do it with a local transverse mercator
+    proj = Proj(proj='tmerc', lat_0=latref, lon_0=lonref, k=1,
+                x_0=0, y_0=0, ellps='WGS84', datum='WGS84',
+                units='m', preserve_units=True)
+    E, N = proj(lon, lat)
+    return E, N
 
 
 def dot(vec_a, vec_b):

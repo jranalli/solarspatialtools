@@ -60,3 +60,30 @@ class TestGMM:
     def test_gaussian_mixture_distribution_matlabvals(self):
         gm, pdf_val = copula._gaussianMixtureDistribution(self._expect['in'], 0.52, self._params)
         assert pdf_val == approx(self._expect['out'], abs=0.001)
+
+
+class TestInverseSample:
+
+    def test_inverse_sample_linear_interp(self):
+        x = np.array([-2.0, -1.0, 0.0, 1.0, 2.0])
+        cdf = np.array([0.0, 0.25, 0.5, 0.75, 1.0])
+        r = np.array([0.125, 0.5, 0.875])
+
+        out = copula.inverse_sample(x, cdf, r)
+        assert out == approx(np.array([-1.5, 0.0, 1.5]))
+
+    def test_inverse_sample_uses_first_duplicate_index(self):
+        x = np.array([-2.0, -1.0, 0.0, 2.0])
+        cdf = np.array([0.0, 0.5, 0.5, 1.0])
+
+        out = copula.inverse_sample(x, cdf, 0.5)
+        assert out == approx(-1.0)
+
+    def test_inverse_sample_preserves_shape(self):
+        x = np.array([-2.0, -1.0, 0.0, 1.0, 2.0])
+        cdf = np.array([0.0, 0.25, 0.5, 0.75, 1.0])
+        r = np.array([[0.1, 0.2], [0.8, 0.9]])
+
+        out = copula.inverse_sample(x, cdf, r)
+        assert out.shape == r.shape
+
