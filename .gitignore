@@ -143,3 +143,7 @@ dmypy.json
 # Sphinx Generated files
 /docs/sphinx/build/*
 /docs/sphinx/source/generated/*
+
+# Some validation stuff
+/tmp_validation/*
+/Matlab/*
