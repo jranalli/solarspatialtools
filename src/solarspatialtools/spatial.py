@@ -571,7 +571,7 @@ def spacetime_distances(x, y, times, cs, cd):
         second (e.g., meters/second).
 
     cd : float
-        The cloud direction in radians, where 0 is north and pi/2 is east.
+        The cloud direction in radians, measured CCW from east
 
     Returns
     -------
@@ -587,22 +587,23 @@ def spacetime_distances(x, y, times, cs, cd):
     dur = (times-t0).total_seconds().values
 
     # Build a time-dependent drift term and broadcast against site coordinates.
-    x_drift = np.asarray(cs) * dur * np.sin(np.asarray(cd))
-    y_drift = np.asarray(cs) * dur * np.cos(np.asarray(cd))
+    x_drift = np.asarray(cs) * dur * np.cos(np.asarray(cd))
+    y_drift = np.asarray(cs) * dur * np.sin(np.asarray(cd))
 
-    # Create a spacetime redefinition of the spatial field - dims are [n_sites, n_times]
+    # Create a spacetime redefinition of the spatial field -
+    # dims are [n_sites, n_times]
     X = np.asarray(x)[:, None] - np.asarray(x_drift)[None, :]
     Y = np.asarray(y)[:, None] - np.asarray(y_drift)[None, :]
     X = X.T  # convert to [n_times, n_sites]
     Y = Y.T
 
     # Flatten the values
-    x = np.asarray(X).reshape(-1, order='F')
-    y = np.asarray(Y).reshape(-1, order='F')
+    xf = np.asarray(X).reshape(-1, order='F')
+    yf = np.asarray(Y).reshape(-1, order='F')
 
     # Calculate the x- and y- spacetime separations, and find magnitude.
-    dx = x[:, None] - x[None, :]
-    dy = y[:, None] - y[None, :]
+    dx = xf[:, None] - xf[None, :]
+    dy = yf[:, None] - yf[None, :]
     D = np.sqrt(dx**2 + dy**2)
 
     return D

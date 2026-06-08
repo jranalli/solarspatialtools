@@ -550,7 +550,7 @@ def test_spacetime_distance_bothy():
     x = [0, 100]
     y = [0, 0]
     cs = 1
-    cd = np.deg2rad(0)
+    cd = np.deg2rad(90)
     times = pd.date_range(start='2024-01-01 00:00:00',
                           end='2024-01-01 00:00:10', freq='10s')
 
@@ -565,7 +565,7 @@ def test_spacetime_distance_bothx():
     x = [0, 100]
     y = [0, 0]
     cs = 1
-    cd = np.deg2rad(90)
+    cd = np.deg2rad(0)
     times = pd.date_range(start='2024-01-01 00:00:00',
                           end='2024-01-01 00:00:10', freq='10s')
 

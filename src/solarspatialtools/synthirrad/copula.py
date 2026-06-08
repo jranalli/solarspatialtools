@@ -215,8 +215,8 @@ def _get_spacetime_distances(sites, times, cs, cd):
 
     return D
 
-def _space_time_copula(N, sites, times, csi, cdf, funchand, p, cs, cd, seed=None):
-    D = _get_spacetime_distances(sites, times, cs, cd)
+def _space_time_copula(N, Epos, Npos, times, csi, cdf, funchand, p, cs, cd, seed=None):
+    D = spatial.spacetime_distances(Epos, Npos, times, cs, cd)
 
     C = funchand(p, D)
 
@@ -227,7 +227,7 @@ def _space_time_copula(N, sites, times, csi, cdf, funchand, p, cs, cd, seed=None
 
     CSI = _inverse_sample(csi, cdf, U)
 
-    CSI = CSI.reshape(N, sites[0].shape[0], times.shape[0]).transpose([0,2,1])
+    CSI = CSI.reshape(N, Epos.shape[0], times.shape[0]).transpose([0,2,1])
 
     return CSI
 
@@ -303,10 +303,7 @@ def __lla2flat_testing():
     print(spatial.lla2flat(lat, lon, lat[0], lon[0], "mercator"))
 
 
-if __name__ == "__main__":
-    # __basic_testing()  # Validated - confident in what this is doing
-    # __lla2flat_testing()  # Mercator and lla2flat algorithm are accurate to centimeters for the latlon given
-
+def __matlab_compare():
 
 
     param = {
@@ -335,7 +332,7 @@ if __name__ == "__main__":
 
     # Cloud speed and direction in radians
     cs = np.array([5, 5, 5, 5, 5, 5])
-    cd = np.array([90, 90, 90, 90, 90, 90]) * 2 * np.pi / 360
+    cd = np.array([0, 0, 0, 0, 0, 0]) * 2 * np.pi / 360
 
     # Hourly clearsky
     hcsi = np.array([0.52,0.71,0.5,0.84,0.63,0.11])
@@ -364,7 +361,7 @@ if __name__ == "__main__":
         fun = lambda p, d: np.exp(-p * d)
         p = _exponential_decay_parameter(mean_csi, param['corr_quadr'])
 
-        M = _space_time_copula(1, (Epos, Npos), times, csi, cdf, fun, p, cs[i], cd[i], 42)
+        M = _space_time_copula(1, Epos, Npos, times, csi, cdf, fun, p, cs[i], cd[i], 42)
 
         cm = M[0,:,:]
 
@@ -394,3 +391,67 @@ if __name__ == "__main__":
     plt.figure()
     plt.hist(c)
     plt.show()
+
+
+def __spatial_compare():
+
+    param = {
+        'comp': [
+            0.8051,
+            7.3605,
+            0.7092
+        ],
+        'mean': [
+            2.2928,
+            1.0801,
+            0.4532
+        ],
+        'sdevClear': [
+            0.3512,
+            4.8414,
+            0.6442
+        ],
+        'sdevCloud': [
+            0.1997,
+            5.0919,
+            0.3863
+        ],
+        'corr_quadr': 0.0043
+    }
+
+    # Cloud speed and direction in radians
+    cs = 1
+    cd = 0
+
+    # Hourly clearsky
+    hcsi = 0.52
+
+    Epos = np.array([ 0, 500,  0, 500, 0])
+    Npos = np.array([ 0,   0, 20,  20, 200])
+
+    times = pd.date_range(start='2024-01-01 00:00:00', end='2024-01-01 00:59:59', freq='15s')
+
+    csi = np.arange(-2, 2, 0.01)
+    mean_csi = hcsi
+
+    pdf, cdf = _solar_gmm(csi, mean_csi, param, debug=False)
+
+    fun = lambda p, d: np.exp(-p * d)
+    p = _exponential_decay_parameter(mean_csi, param['corr_quadr'])
+
+    M = _space_time_copula(1, Epos, Npos, times, csi, cdf, fun, p, cs, cd, 42)
+
+    c = M[0,:,:]
+
+    import matplotlib.pyplot as plt
+    plt.plot(times, c, alpha=0.8)
+    plt.legend([1,2,3,4,5])
+    plt.show()
+
+
+
+if __name__ == "__main__":
+    # __basic_testing()  # Validated - confident in what this is doing
+    # __lla2flat_testing()  # Mercator and lla2flat algorithm are accurate to centimeters for the latlon given
+    # __matlab_compare()
+    __spatial_compare()
