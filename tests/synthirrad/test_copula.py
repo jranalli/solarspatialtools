@@ -1,3 +1,4 @@
+import pandas as pd
 from pytest import approx
 import numpy as np
 
@@ -50,7 +51,7 @@ class TestGMDistribution:
 
     def test_gmdistribution_matlab(self):
         x = np.arange(-2, 2, 0.01)
-        _, _, y = copula._gmdistribution(x, self._params['mean'], self._params['sigma'], self._params['p'])
+        _, y = copula._gmdistribution(x, self._params['mean'], self._params['sigma'], self._params['p'])
         # extract the y values that correspond to the 3 values in _expect['x']
         y_vals = [y[np.argmin(np.abs(x - target))] for target in self._expect['x']]
 
@@ -70,19 +71,8 @@ class TestSolarGMM:
         'out': np.array([0.0000, 0.0000, 0.0145, 2.1843, 0.2287, 0.1231])
     }
 
-    def test_solar_gmm_scalar_csi(self):
-        gm, _, _ = copula._solar_gmm(0.1, 0.52, self._params)
-
-        assert gm.means_.shape == (2, 1)
-
-    def test_solar_gmm_vector_csi(self):
-        csi = np.linspace(-2, 2, 21)
-        gm, _, _ = copula._solar_gmm(csi, 0.52, self._params)
-
-        assert gm.means_.shape == (2, 1)
-
     def test_solar_gmm_matlabvals(self):
-        gm, pdf_val, _ = copula._solar_gmm(self._expect['in'], 0.52, self._params)
+        pdf_val, _ = copula._solar_gmm(self._expect['in'], 0.52, self._params)
         assert pdf_val == approx(self._expect['out'], abs=0.001)
 
 
@@ -117,3 +107,58 @@ class TestInverseSample:
 
         out = copula._inverse_sample(x, cdf, r)
         assert out.shape == r.shape
+
+
+def test_spacetime_distance_sametime():
+    x = [0, 100]
+    y = [0, 0]
+    cs = 10
+    cd = np.deg2rad(90)
+    times = pd.date_range(start='2024-01-01 00:00:00', end='2024-01-01 00:00:00', freq='10s')
+
+    D_expect = np.array([[0,100],[100,0]])
+
+    D = copula._get_spacetime_distances((x,y), times, cs, cd)
+    assert D == approx(D_expect)
+
+def test_spacetime_distance_sameplace():
+    x = [0]
+    y = [0]
+    cs = 1
+    cd = np.deg2rad(90)
+    times = pd.date_range(start='2024-01-01 00:00:00',
+                          end='2024-01-01 00:00:10', freq='10s')
+
+    D_expect = np.array([[0, 10], [10, 0]])
+    D = copula._get_spacetime_distances((x, y), times, cs, cd)
+    assert D == approx(D_expect)
+
+def test_spacetime_distance_bothy():
+    x = [0, 100]
+    y = [0, 0]
+    cs = 1
+    cd = np.deg2rad(0)
+    times = pd.date_range(start='2024-01-01 00:00:00',
+                          end='2024-01-01 00:00:10', freq='10s')
+
+    D_expect = np.array([[0, 10, 100, np.sqrt(10100)],
+                         [10, 0, np.sqrt(10100), 100],
+                         [100, np.sqrt(10100), 0, 10],
+                         [np.sqrt(10100), 100, 10, 0]])
+    D = copula._get_spacetime_distances((x, y), times, cs, cd)
+    assert D == approx(D_expect)
+
+def test_spacetime_distance_bothx():
+    x = [0, 100]
+    y = [0, 0]
+    cs = 1
+    cd = np.deg2rad(90)
+    times = pd.date_range(start='2024-01-01 00:00:00',
+                          end='2024-01-01 00:00:10', freq='10s')
+
+    D_expect = np.array([[0, 10, 100, 90],
+                         [10, 0, 110, 100],
+                         [100, 110, 0, 10],
+                         [90, 100, 10, 0]])
+    D = copula._get_spacetime_distances((x, y), times, cs, cd)
+    assert D == approx(D_expect)

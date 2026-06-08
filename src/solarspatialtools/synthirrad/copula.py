@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from sklearn.mixture import GaussianMixture
+from sklearn.mixture._gaussian_mixture import _compute_precision_cholesky
 
 from solarspatialtools import spatial
 from scipy.stats import norm, multivariate_normal
@@ -28,26 +29,50 @@ def _sigmoid(x, a, c):
     return 1 / (1 + np.exp(-a * (x - c)))
 
 
-def _gmdistribution(x, mu, sigma, p, debug=False):
+def _gmdistribution(x, mu, vars, p, debug=False):
     """
     Wrap sklearn's GaussianMixture to behave more like the matlab gmdistribution function.
-    Desired outputs for subsequent code are the pdf and cdf. CDF is scaled from 0 - 1.
-    """
-    mu = np.array(mu).reshape(-1, 1)
-    sigma = np.array(sigma).reshape(-1, 1, 1)   # 1D full covariance form
-    p = np.array(p)
 
+    Parameters
+    ----------
+    x : np.array
+        The x values at which to compute the probability of the distribution
+    mu : np.array
+        The means for each component, shape (n_components,)
+    vars : np.array
+        The variances for each component, shape (n_components,)
+    p : np.array
+        The weights for each component, shape (n_components,)
+    debug : bool, optional
+        If True, plot the pdf and cdf for visual inspection. Default is False.
+
+    Returns
+    -------
+    np.array
+        The pdf values at the input x, shape (len(x),)
+    np.array
+        The cdf values at the input x, shape (len(x),), scaled 0-1
+    """
+
+    # Reshape inputs to the correct form
+    x_inp = np.atleast_1d(np.asarray(x)).reshape(-1, 1)
+    mu = np.array(mu).reshape(-1, 1)  # means
+    vars = np.array(vars).reshape(-1, 1, 1)  # stdevs
+    p = np.array(p)  # weights
+
+    # Apply to create the GaussianMixture
     gm = GaussianMixture(n_components=len(p), covariance_type="full")
     gm.weights_ = p
     gm.means_ = mu
-    gm.covariances_ = sigma
-    gm.precisions_cholesky_ = 1 / np.sqrt(sigma)
+    gm.covariances_ = vars
+    gm.precisions_cholesky_ = _compute_precision_cholesky(vars, 'full')
 
-    x_input = np.asarray(x)
-    x_samples = np.atleast_1d(x_input).reshape(-1, 1)
-    pdf_val = np.exp(gm.score_samples(x_samples))
-    cdf_val = np.cumsum(pdf_val) / np.max(np.cumsum(pdf_val))
-    if x_input.ndim == 0:
+    # use score_samples to predict the log-likelihood of each input.
+    pdf_val = np.exp(gm.score_samples(x_inp))
+    cdf_val = np.cumsum(pdf_val) / np.max(np.cumsum(pdf_val))  # scale 0-1
+
+    # Realign output dimensions
+    if x_inp.ndim == 0:
         pdf_val = float(pdf_val[0])
         cdf_val = float(cdf_val[0])
 
@@ -58,39 +83,75 @@ def _gmdistribution(x, mu, sigma, p, debug=False):
         plt.plot(x, cdf_val)
         plt.show()
 
-    return gm, pdf_val, cdf_val
+    return pdf_val, cdf_val
+
 
 def _inverse_sample(x, cdf, r):
-    x = np.asarray(x, dtype=float).reshape(-1)
-    cdf = np.asarray(cdf, dtype=float).reshape(-1)
+    """
+    Perform inverse sampling using linear interpolation. Given a CDF defined by (x, cdf), and a random value r in
+    [0, 1], return the corresponding x value whose CDF is equal to r.
 
-    if x.size == 0 or cdf.size == 0:
-        raise ValueError("x and cdf must be non-empty.")
-    if x.size != cdf.size:
-        raise ValueError("x and cdf must have the same length.")
+    Parameters
+    ----------
+    x : np.array
+        The x values corresponding to the CDF, shape (n,) - in this case CSIs
+    cdf : np.array
+        The CDF values, shape (n,) - probability of CSI value less than given CSI.
+    r : np.array or float
+        The random value(s) in [0, 1] for which to compute the inverse sample, shape (m,) or scalar
+        i.e. r=0.5 finds what CSI has probability 50%?
+
+    Returns
+    -------
+    np.array or float
+        The x-values whose CDF is equal to r.
+    """
+
+    x = np.asarray(x)
+    cdf = np.asarray(cdf)
 
     # MATLAB-style unique(cdf) with indices used to subset x.
     Fxu, inds = np.unique(cdf, return_index=True)
+    xu = x[inds].astype(float, copy=True)
 
-    if Fxu.size == 1:
-        Fxu = np.array([-99999.0, 99999.0])
-        xu = np.array([-2.0, 2.0])
-    else:
-        xu = x[inds].astype(float, copy=True)
-        Fxu = Fxu.astype(float, copy=True)
-        xu = np.concatenate([[-2.0], xu, [2.0]])
-        Fxu = np.concatenate([[-99999.0], Fxu, [99999.0]])
+    # Pad on either end to ensure that small overflows still have meaning
+    xu = np.concatenate([[-2.0], xu, [2.0]])  # X represents CSI
+    Fxu = np.concatenate([[-0.0], Fxu, [1.0]])  # Fxu Represents the CDF
 
+    # Perform interpolation
     r_arr = np.asarray(r, dtype=float)
     s = np.interp(r_arr.reshape(-1), Fxu, xu)
 
+    # Retain dtype of input
     if r_arr.ndim == 0:
         return float(s[0])
     return s.reshape(r_arr.shape)
 
 
 def _solar_gmm(csi, meanCSI, params, debug=False):
-    """Build a 1D Gaussian mixture and evaluate its PDF at csi values."""
+    """
+    Compute the parameters of a gaussian mixture model of clear and cloudy moments. Return the PDF and CDF of the model.
+
+    Parameters
+    ----------
+    csi : np.array
+        The CSI values at which to compute the PDF and CDF, shape (n,)
+    meanCSI : float
+        The mean CSI for the hour, used to compute the parameters of the GMM.
+    params : dict
+        The parameters of the model, containing:
+        - 'comp': [a, c] parameters for the sigmoid function that determines the cloudy component weight based on meanCSI.
+        - 'mean': [m_cloud, m_clear, c] parameters for computing the means of the cloud and clear components based on meanCSI and the cloudy component weight.
+        - 'sdevClear': [sdev_clear_max, a, c] parameters for computing the standard deviation of the clear component based on meanCSI.
+        - 'sdevCloud': [sdev_cloud_max, a, c] parameters for computing the standard deviation of the cloud component based on meanCSI.
+
+    Returns
+    -------
+    np.array
+        The PDF values at the input CSI, shape (n,)
+    np.array
+        The CDF values at the input CSI, shape (n,), scaled 0-1
+    """
     comp_cloud = 1 - params['comp'][0]*_sigmoid(meanCSI, params['comp'][1],params['comp'][2])
     comp_clear = 1 - comp_cloud
     mean_clear = params['mean'][0] * comp_cloud * meanCSI + params['mean'][1] * (1 - comp_cloud) * (meanCSI - params['mean'][2])
@@ -100,13 +161,29 @@ def _solar_gmm(csi, meanCSI, params, debug=False):
 
     mu = [mean_cloud, mean_clear]
     p = [comp_cloud, comp_clear]
-    sigma = [sdev_cloud**2, sdev_clear**2]
+    vars = [sdev_cloud**2, sdev_clear**2]
 
-    gm, pdf_val, cdf_val = _gmdistribution(csi, mu, sigma, p, debug)
+    pdf_val, cdf_val = _gmdistribution(csi, mu, vars, p, debug)
 
-    return gm, pdf_val, cdf_val
+    return pdf_val, cdf_val
+
 
 def _exponential_decay_parameter(K, p):
+    """
+    Compute the exponential decay parameter for the copula based on the mean CSI and the quadratic correlation parameter.
+
+    Parameters
+    ----------
+    K : float
+        The mean CSI for the hour, used to compute the exponential decay parameter.
+    p : float
+        The quadratic correlation parameter, controlling how quickly the correlation decays with distance.
+
+    Returns
+    -------
+    float
+        The exponential decay parameter for the copula, which controls how quickly the correlation decays with distance. Higher values of p lead to faster decay, while higher values of K (mean CSI) lead to slower decay.
+    """
     k = p * K * (1-K)
     if k < 10**-5:
         k = 10**-5
@@ -115,7 +192,8 @@ def _exponential_decay_parameter(K, p):
 
 def _get_spacetime_distances(sites, times, cs, cd):
     # xref, yref = spatial.latlon2lcs(sites[0], sites[1], sites[0][0], sites[1][0])
-    xref, yref = spatial.lla2flat(sites[0], sites[1], sites[0][0], sites[1][0], 'matlab')
+    xref = sites[0]
+    yref = sites[1]
 
     t0 = times[0]
     dur = (times-t0).total_seconds().values
@@ -137,12 +215,15 @@ def _get_spacetime_distances(sites, times, cs, cd):
 
     return D
 
-def _space_time_copula(N, sites, times, csi, cdf, funchand, p, cs, cd):
+def _space_time_copula(N, sites, times, csi, cdf, funchand, p, cs, cd, seed=None):
     D = _get_spacetime_distances(sites, times, cs, cd)
 
     C = funchand(p, D)
 
-    U = copularnd_gaussian(C, N)
+    if seed is None:
+        U = copularnd_gaussian(C, N)
+    else:
+        U = copularnd_gaussian(C, N, seed)
 
     CSI = _inverse_sample(csi, cdf, U)
 
@@ -262,6 +343,8 @@ if __name__ == "__main__":
     # lat
     lat = np.array([21.31236, 21.31303, 21.32357])
     lon = np.array([-158.08463, -158.08505, -158.08424])
+    # Epos, Npos = spatial.latlon2lcs(lat, lon, lat[0], lon[0])
+    Epos, Npos = spatial.lla2flat(lat, lon, lat[0], lon[0], method="tmerc")
 
     times = pd.date_range(start='2024-01-01 00:00:00', end='2024-01-01 00:59:59', freq='15s')
 
@@ -276,12 +359,12 @@ if __name__ == "__main__":
         csi = np.arange(-2, 2, 0.01)
         mean_csi = hcsi[i]
 
-        gm, pdf, cdf = _solar_gmm(csi, mean_csi, param, debug=False)
+        pdf, cdf = _solar_gmm(csi, mean_csi, param, debug=False)
 
         fun = lambda p, d: np.exp(-p * d)
         p = _exponential_decay_parameter(mean_csi, param['corr_quadr'])
 
-        M = _space_time_copula(1, (lat, lon), times, csi, cdf, fun, p, cs[i], cd[i])
+        M = _space_time_copula(1, (Epos, Npos), times, csi, cdf, fun, p, cs[i], cd[i], 42)
 
         cm = M[0,:,:]
 
