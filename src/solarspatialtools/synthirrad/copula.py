@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-from optype._core import _has
 from sklearn.mixture import GaussianMixture
 from sklearn.mixture._gaussian_mixture import _compute_precision_cholesky
 
