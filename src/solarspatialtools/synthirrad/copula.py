@@ -1,12 +1,16 @@
 import numpy as np
 import pandas as pd
+from optype._core import _has
 from sklearn.mixture import GaussianMixture
 from sklearn.mixture._gaussian_mixture import _compute_precision_cholesky
 
 from solarspatialtools import spatial
 from scipy.stats import norm, multivariate_normal
 
-# [1] Widen, J. and Munkhammar, J., "Spatio-Temporal Downscaling of Hourly Solar irradiance Data Using Gaussian Copulas," 2019 IEEE 46th Photovoltaic Specialists Conference (PVSC), Chicago, IL, USA, 2019, pp. 3172-3178, doi: 10.1109/PVSC40753.2019.8980922.
+# [1] Widen, J. and Munkhammar, J., "Spatio-Temporal Downscaling of Hourly
+# Solar irradiance Data Using Gaussian Copulas," 2019 IEEE 46th Photovoltaic
+# Specialists Conference (PVSC), Chicago, IL, USA, 2019, pp. 3172-3178,
+# doi: 10.1109/PVSC40753.2019.8980922.
 
 def _sigmoid(x, a, c):
     """
@@ -31,7 +35,8 @@ def _sigmoid(x, a, c):
 
 def _gmdistribution(x, mu, vars, p, debug=False):
     """
-    Wrap sklearn's GaussianMixture to behave more like the matlab gmdistribution function.
+    Wrap sklearn's GaussianMixture to behave more like the matlab
+    gmdistribution function.
 
     Parameters
     ----------
@@ -72,7 +77,7 @@ def _gmdistribution(x, mu, vars, p, debug=False):
     cdf_val = np.cumsum(pdf_val) / np.max(np.cumsum(pdf_val))  # scale 0-1
 
     # Realign output dimensions
-    if x_inp.ndim == 0:
+    if np.array(x).ndim == 0:
         pdf_val = float(pdf_val[0])
         cdf_val = float(cdf_val[0])
 
@@ -88,18 +93,22 @@ def _gmdistribution(x, mu, vars, p, debug=False):
 
 def _inverse_sample(x, cdf, r):
     """
-    Perform inverse sampling using linear interpolation. Given a CDF defined by (x, cdf), and a random value r in
-    [0, 1], return the corresponding x value whose CDF is equal to r.
+    Perform inverse sampling using linear interpolation. Given a CDF defined
+    by (x, cdf), and a random value r in [0, 1], return the corresponding x
+    value whose CDF is equal to r.
 
     Parameters
     ----------
     x : np.array
         The x values corresponding to the CDF, shape (n,) - in this case CSIs
+
     cdf : np.array
-        The CDF values, shape (n,) - probability of CSI value less than given CSI.
+        The CDF values, shape (n,) - probability of CSI value less than given
+        CSI.
+
     r : np.array or float
-        The random value(s) in [0, 1] for which to compute the inverse sample, shape (m,) or scalar
-        i.e. r=0.5 finds what CSI has probability 50%?
+        The random value(s) in [0, 1] for which to compute the inverse sample,
+        shape (m,) or scalar i.e. r=0.5 finds what CSI has probability 50%?
 
     Returns
     -------
@@ -130,7 +139,8 @@ def _inverse_sample(x, cdf, r):
 
 def _solar_gmm(csi, meanCSI, params, debug=False):
     """
-    Compute the parameters of a gaussian mixture model of clear and cloudy moments. Return the PDF and CDF of the model.
+    Compute the parameters of a gaussian mixture model of clear and cloudy
+    moments. Return the PDF and CDF of the model.
 
     Parameters
     ----------
@@ -139,11 +149,16 @@ def _solar_gmm(csi, meanCSI, params, debug=False):
     meanCSI : float
         The mean CSI for the hour, used to compute the parameters of the GMM.
     params : dict
-        The parameters of the model, containing:
-        - 'comp': [a, c] parameters for the sigmoid function that determines the cloudy component weight based on meanCSI.
-        - 'mean': [m_cloud, m_clear, c] parameters for computing the means of the cloud and clear components based on meanCSI and the cloudy component weight.
-        - 'sdevClear': [sdev_clear_max, a, c] parameters for computing the standard deviation of the clear component based on meanCSI.
-        - 'sdevCloud': [sdev_cloud_max, a, c] parameters for computing the standard deviation of the cloud component based on meanCSI.
+        The parameters of the model, containing at least:
+        - 'comp': [a, c] parameters for the sigmoid function that determines
+            the cloudy component weight based on meanCSI.
+        - 'mean': [m_cloud, m_clear, c] parameters for computing the means of
+            the cloud and clear components based on meanCSI and the cloudy
+            component weight.
+        - 'sdevClear': [sdev_clear_max, a, c] parameters for computing the
+            standard deviation of the clear component based on meanCSI.
+        - 'sdevCloud': [sdev_cloud_max, a, c] parameters for computing the
+            standard deviation of the cloud component based on meanCSI.
 
     Returns
     -------
@@ -152,9 +167,12 @@ def _solar_gmm(csi, meanCSI, params, debug=False):
     np.array
         The CDF values at the input CSI, shape (n,), scaled 0-1
     """
-    comp_cloud = 1 - params['comp'][0]*_sigmoid(meanCSI, params['comp'][1],params['comp'][2])
+    comp_cloud = (1 -
+                  params['comp'][0] *
+                  _sigmoid(meanCSI, params['comp'][1], params['comp'][2]))
     comp_clear = 1 - comp_cloud
-    mean_clear = params['mean'][0] * comp_cloud * meanCSI + params['mean'][1] * (1 - comp_cloud) * (meanCSI - params['mean'][2])
+    mean_clear = (params['mean'][0] * comp_cloud * meanCSI +
+                  params['mean'][1] * (1 - comp_cloud) * (meanCSI - params['mean'][2]))
     mean_cloud = (meanCSI - comp_clear * mean_clear) / comp_cloud
     sdev_clear = params['sdevClear'][0] * (1 - _sigmoid(meanCSI, params['sdevClear'][1],params['sdevClear'][2]))
     sdev_cloud = params['sdevCloud'][0] * _sigmoid(meanCSI, params['sdevCloud'][1], params['sdevCloud'][2])
@@ -170,99 +188,109 @@ def _solar_gmm(csi, meanCSI, params, debug=False):
 
 def _exponential_decay_parameter(K, p):
     """
-    Compute the exponential decay parameter for the copula based on the mean CSI and the quadratic correlation parameter.
+    Compute the exponential decay parameter for the copula based on the mean
+    CSI and the quadratic correlation parameter.
 
     Parameters
     ----------
     K : float
-        The mean CSI for the hour, used to compute the exponential decay parameter.
+        The mean CSI for the hour, used to compute the exponential
+        decay parameter.
+
     p : float
-        The quadratic correlation parameter, controlling how quickly the correlation decays with distance.
+        The quadratic correlation parameter, controlling how quickly the
+        correlation decays with distance.
 
     Returns
     -------
     float
-        The exponential decay parameter for the copula, which controls how quickly the correlation decays with distance. Higher values of p lead to faster decay, while higher values of K (mean CSI) lead to slower decay.
+        The exponential decay parameter for the copula, which controls how
+        quickly the correlation decays with distance. Higher values of p lead
+        to faster decay, while higher values of K (mean CSI) lead to slower
+        decay.
     """
     k = p * K * (1-K)
     if k < 10**-5:
         k = 10**-5
     return k
 
+def _space_time_copula(N, Epos, Npos, times, csi, cdf, p, cs, cd, seed=None):
+    """
+    Generate the synthetic CSI for a position field using a spacetime copula.
 
-def _get_spacetime_distances(sites, times, cs, cd):
-    # xref, yref = spatial.latlon2lcs(sites[0], sites[1], sites[0][0], sites[1][0])
-    xref = sites[0]
-    yref = sites[1]
+    Parameters
+    ----------
+    N : int
+        The number of versions of the samples to generate.
+    Epos : float
+        The eastward positions of the sites, shape (n_sites,)
+    Npos : float
+    The northward positions of the sites, shape (n_sites,)
+    times : pd.DatetimeIndex
+    A DatetimeIndex of shape (n_times,) representing the time points for
+        which to compute distances.
+    csi : float
+    The CSI values corresponding to the CDF, shape (n_csi,). This is used for inverse sampling after generating the copula samples.
+    cdf : float
+    The CDF values corresponding to the CDF, shape (n_cdf,). This is used for inverse sampling after generating the copula samples.
+    p : float
+    The quadratic correlation parameter, controlling how quickly the correlation decays
+    with distance.
+    cs : float
+    The cloud speed in the same units as Epos and Npos per unit time. This is used to compute the spacetime distances.
+    cd : float
+    The cloud direction in radians, where 0 is eastward and pi/2 is northward. This is used to compute the spacetime distances.
+    seed : int or None
+    Seed for the random number generator.
 
-    t0 = times[0]
-    dur = (times-t0).total_seconds().values
+    Results
+    -------
+    np.array
+        The synthetic CSI values generated by the copula, shape (N, n_times, n_sites).
+    """
 
-    # Build a time-dependent drift term and broadcast against site coordinates.
-    x_drift = np.asarray(cs) * dur * np.sin(np.asarray(cd))
-    y_drift = np.asarray(cs) * dur * np.cos(np.asarray(cd))
-
-    X = np.asarray(xref)[:, None] - np.asarray(x_drift)[None, :]
-    Y = np.asarray(yref)[:, None] - np.asarray(y_drift)[None, :]
-    X = X.T
-    Y = Y.T
-
-    x = np.asarray(X).reshape(-1, order='F')
-    y = np.asarray(Y).reshape(-1, order='F')
-    dx = x[:, None] - x[None, :]
-    dy = y[:, None] - y[None, :]
-    D = np.sqrt(dx**2 + dy**2)
-
-    return D
-
-def _space_time_copula(N, Epos, Npos, times, csi, cdf, funchand, p, cs, cd, seed=None):
     D = spatial.spacetime_distances(Epos, Npos, times, cs, cd)
 
+    funchand = lambda p, d: np.exp(-p * d)
     C = funchand(p, D)
 
-    if seed is None:
-        U = copularnd_gaussian(C, N)
-    else:
-        U = copularnd_gaussian(C, N, seed)
+    # Generate uniform samples from the copula with appropriate correlation
+    U = _copularnd_gaussian(C, N, seed)
 
+    # Invert uniform samples based on the original CDF back to the CSI
+    # Reshape to match the individual time series desired for each site.
     CSI = _inverse_sample(csi, cdf, U)
-
     CSI = CSI.reshape(N, Epos.shape[0], times.shape[0]).transpose([0,2,1])
 
     return CSI
 
 
-def scatter_hist(x, y):
-    import matplotlib.pyplot as plt
+def _copularnd_gaussian(C, N, random_state=None):
+    """
+    Generate the copula samples using a Gaussian copula. This involves
+    generating multivariate normal samples with covariance C, and then applying
+    the standard normal CDF to transform them into uniform samples. They can
+    be converted in a second step.
 
-    fig, axs = plt.subplot_mosaic([['histx', '.'],
-                                   ['scatter', 'histy']],
-                                  figsize=(6, 6),
-                                  width_ratios=(4, 1), height_ratios=(1, 4),
-                                  layout='constrained')
-    ax = axs['scatter']
-    ax_histx = axs['histx']
-    ax_histy = axs['histy']
+    Parameters
+    ----------
+    C : float
+        The covariance matrix for the Gaussian copula, shape (d, d), where d is
+        the number of sites times the number of spacetime elements. All
+        spacetime elements are concatenated.
 
-    # no labels
-    ax_histx.tick_params(axis="x", labelbottom=False)
-    ax_histy.tick_params(axis="y", labelleft=False)
+    N : int
+        The number of versions of the samples to generate.
 
-    # the scatter plot:
-    ax.scatter(x, y)
+    random_state : int or None
+        Seed for the random number generator.
 
-    # now determine nice limits by hand:
-    binwidth = 0.25
-    xymax = max(np.max(np.abs(x)), np.max(np.abs(y)))
-    lim = (int(xymax/binwidth) + 1) * binwidth
-
-    bins = np.arange(-lim, lim + binwidth, binwidth)
-    ax_histx.hist(x, bins=bins)
-    ax_histy.hist(y, bins=bins, orientation='horizontal')
-    plt.show()
-
-def copularnd_gaussian(C, N, random_state=None):
-
+    Results
+    -------
+    np.array
+        The uniform samples generated by the Gaussian copula, shape is
+        (N, n_sites * n_times).
+    """
     rng = np.random.default_rng(random_state)
     d = C.shape[0]
     z = rng.multivariate_normal(mean=np.zeros(d), cov=C, size=N)
@@ -358,10 +386,9 @@ def __matlab_compare():
 
         pdf, cdf = _solar_gmm(csi, mean_csi, param, debug=False)
 
-        fun = lambda p, d: np.exp(-p * d)
         p = _exponential_decay_parameter(mean_csi, param['corr_quadr'])
 
-        M = _space_time_copula(1, Epos, Npos, times, csi, cdf, fun, p, cs[i], cd[i], 42)
+        M = _space_time_copula(1, Epos, Npos, times, csi, cdf, p, cs[i], cd[i], 42)
 
         cm = M[0,:,:]
 
@@ -436,10 +463,9 @@ def __spatial_compare():
 
     pdf, cdf = _solar_gmm(csi, mean_csi, param, debug=False)
 
-    fun = lambda p, d: np.exp(-p * d)
     p = _exponential_decay_parameter(mean_csi, param['corr_quadr'])
 
-    M = _space_time_copula(1, Epos, Npos, times, csi, cdf, fun, p, cs, cd, 42)
+    M = _space_time_copula(1, Epos, Npos, times, csi, cdf, p, cs, cd, 42)
 
     c = M[0,:,:]
 
@@ -453,5 +479,5 @@ def __spatial_compare():
 if __name__ == "__main__":
     # __basic_testing()  # Validated - confident in what this is doing
     # __lla2flat_testing()  # Mercator and lla2flat algorithm are accurate to centimeters for the latlon given
-    # __matlab_compare()
+    __matlab_compare()
     __spatial_compare()

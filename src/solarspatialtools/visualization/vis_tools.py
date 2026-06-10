@@ -1,4 +1,5 @@
 import matplotlib
+import matplotlib.pyplot as plt
 import numpy as np
 
 
@@ -48,3 +49,36 @@ def annotate_fig(axis):
                       rotation='vertical',
                       ha='center',
                       va='bottom')
+
+
+def scatter_hist(x, y):
+    """
+    Generate a scatterplot with histograms on the x & y axes. Useful for
+    showing joint distributions
+    """
+
+    fig, axs = plt.subplot_mosaic([['histx', '.'],
+                                   ['scatter', 'histy']],
+                                  figsize=(6, 6),
+                                  width_ratios=(4, 1), height_ratios=(1, 4),
+                                  layout='constrained')
+    ax = axs['scatter']
+    ax_histx = axs['histx']
+    ax_histy = axs['histy']
+
+    # no labels
+    ax_histx.tick_params(axis="x", labelbottom=False)
+    ax_histy.tick_params(axis="y", labelleft=False)
+
+    # the scatter plot:
+    ax.scatter(x, y)
+
+    # now determine nice limits by hand:
+    binwidth = 0.25
+    xymax = max(np.max(np.abs(x)), np.max(np.abs(y)))
+    lim = (int(xymax/binwidth) + 1) * binwidth
+
+    bins = np.arange(-lim, lim + binwidth, binwidth)
+    ax_histx.hist(x, bins=bins)
+    ax_histy.hist(y, bins=bins, orientation='horizontal')
+    plt.show()
