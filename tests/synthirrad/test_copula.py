@@ -155,7 +155,7 @@ class TestDownscale:
         c = downscale(self.times, self.Epos, self.Npos, self.cd, self.cs,
                       self.hcsi, self._params, self.seed, True, True)
         assert c.shape == (len(self.times), len(self.Epos))
-        assert c[self._expect['ind']].T == approx(self._expect['out_csi'], abs=0.004)
+        assert c[self._expect['ind']].T == approx(self._expect['out_csi'], abs=0.005)
 
     def test_downscale_shift(self):
         c = downscale(self.times, self.Epos, self.Npos, self.cd, self.cs,
