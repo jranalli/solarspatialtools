@@ -3,6 +3,7 @@ from pytest import approx
 import numpy as np
 
 from solarspatialtools.synthirrad import copula
+from solarspatialtools.synthirrad.copula import downscale
 
 
 class TestBasics:
@@ -75,16 +76,21 @@ class TestSolarGMM:
         'mean': [2.2928, 1.0801, 0.4532],
         'sdevClear': [0.3512, 4.8414, 0.6442],
         'sdevCloud': [0.1997, 5.0919, 0.3863],
+        'corr_quadr': 0.0043
     }
 
     _expect = {
         'in': np.array([-1, -0.5, 0, 0.5, 0.8, 0.1]),
-        'out': np.array([0.0000, 0.0000, 0.0145, 2.1843, 0.2287, 0.1231])
+        'out_pdf': np.array([0.0000, 0.0000, 0.0145, 2.1843, 0.2287, 0.1231]),
+        'out_cdf': np.array([0.0000, 0.0000, 0.00568, 0.8621, 0.95175, 1.0]),
+        'p': 0.00107328
     }
 
     def test_solar_gmm_matlabvals(self):
-        pdf_val, _ = copula._solar_gmm(self._expect['in'], 0.52, self._params)
-        assert pdf_val == approx(self._expect['out'], abs=0.001)
+        pdf_val, cdf_val, p = copula._solar_gmm(self._expect['in'], 0.52, self._params)
+        assert pdf_val == approx(self._expect['out_pdf'], abs=0.001)
+        assert cdf_val == approx(self._expect['out_cdf'], abs=0.001)
+        assert p == approx(self._expect['p'])
 
 
 class TestInverseSample:
@@ -118,3 +124,40 @@ class TestInverseSample:
 
         out = copula._inverse_sample(x, cdf, r)
         assert out.shape == r.shape
+
+
+class TestDownscale:
+    _params = {
+        'comp': [0.8051, 7.3605, 0.7092],
+        'mean': [2.2928, 1.0801, 0.4532],
+        'sdevClear': [0.3512, 4.8414, 0.6442],
+        'sdevCloud': [0.1997, 5.0919, 0.3863],
+        'corr_quadr': 0.0043
+    }
+
+    cs = 1
+    cd = 0
+    hcsi = 0.52
+    Epos = np.array([ 0, 450])
+    Npos = np.array([ 0,   0])
+    times = pd.date_range(start='2024-01-01 00:00:00',
+                          end='2024-01-01 00:59:59', freq='15s')
+    seed = 42
+
+
+    _expect = {
+        'ind': np.array([10,50,100,150,200]),
+        'out_csi': np.array([[0.61526346, 0.49949705, 0.87102799, 0.29530502, 0.41524741],
+                            [0.60581759, 0.52628747, 0.69702407, 0.4410184 , 0.31617515]])
+    }
+
+    def test_downscale_stability(self):
+        c = downscale(self.times, self.Epos, self.Npos, self.cd, self.cs,
+                      self.hcsi, self._params, self.seed, True, True)
+        assert c.shape == (len(self.times), len(self.Epos))
+        assert c[self._expect['ind']].T == approx(self._expect['out_csi'])
+
+    def test_downscale_shift(self):
+        c = downscale(self.times, self.Epos, self.Npos, self.cd, self.cs,
+                      self.hcsi, self._params, self.seed, True, True)
+        assert c[:-30,0] == approx(c[30:,1])
