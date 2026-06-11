@@ -5,7 +5,7 @@ import numpy as np
 from scipy.stats import spearmanr, kstest, uniform
 
 from solarspatialtools.synthirrad import copula
-from solarspatialtools.synthirrad.copula import downscale
+from solarspatialtools.synthirrad.copula import downscale, downscale_multihour
 
 
 class TestBasics:
@@ -154,15 +154,21 @@ class TestDownscale:
     }
 
     def test_downscale_stability(self):
-        c = downscale(self.times, self.Epos, self.Npos, self.cd, self.cs,
+        c = downscale(self.times, self.Epos, self.Npos, self.cs, self.cd,
                       self.hcsi, self._params, self.seed, True, True)
         assert c.shape == (len(self.times), len(self.Epos))
         assert c[self._expect['ind']].T == approx(self._expect['out_csi'], abs=0.002)
 
     def test_downscale_shift(self):
-        c = downscale(self.times, self.Epos, self.Npos, self.cd, self.cs,
+        c = downscale(self.times, self.Epos, self.Npos, self.cs, self.cd,
                       self.hcsi, self._params, self.seed, True, True)
         assert c[:-30,0] == approx(c[30:,1])
+
+    def test_downscale_multihour(self):
+        hcsi_multi = [self.hcsi, self.hcsi, self.hcsi]
+        c = downscale_multihour(self.times, self.Epos, self.Npos, self.cs, self.cd,
+                                hcsi_multi, self._params, self.seed, True, True)
+        assert c.shape == (len(self.times)*len(hcsi_multi), len(self.Epos))
 
 
 class TestCopularndGaussian:
