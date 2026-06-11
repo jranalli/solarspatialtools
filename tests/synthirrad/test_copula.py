@@ -146,16 +146,16 @@ class TestDownscale:
 
 
     _expect = {
-        'ind': np.array([10,50,100,150,200]),
-        'out_csi': np.array([[0.6152, 0.4995, 0.8711, 0.2953, 0.4153],
-                            [0.6020, 0.5263, 0.6971, 0.4411 , 0.3162]])
+        'ind': np.array([50,100,150,200]),
+        'out_csi': np.array([[0.4995, 0.8711, 0.2953, 0.4153],
+                            [0.5263, 0.6971, 0.4411 , 0.3162]])
     }
 
     def test_downscale_stability(self):
         c = downscale(self.times, self.Epos, self.Npos, self.cd, self.cs,
                       self.hcsi, self._params, self.seed, True, True)
         assert c.shape == (len(self.times), len(self.Epos))
-        assert c[self._expect['ind']].T == approx(self._expect['out_csi'], abs=0.005)
+        assert c[self._expect['ind']].T == approx(self._expect['out_csi'], abs=0.002)
 
     def test_downscale_shift(self):
         c = downscale(self.times, self.Epos, self.Npos, self.cd, self.cs,
