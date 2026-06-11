@@ -2,6 +2,8 @@ import pandas as pd
 from pytest import approx
 import numpy as np
 
+from scipy.stats import spearmanr, kstest, uniform
+
 from solarspatialtools.synthirrad import copula
 from solarspatialtools.synthirrad.copula import downscale
 
@@ -161,3 +163,214 @@ class TestDownscale:
         c = downscale(self.times, self.Epos, self.Npos, self.cd, self.cs,
                       self.hcsi, self._params, self.seed, True, True)
         assert c[:-30,0] == approx(c[30:,1])
+
+
+class TestCopularndGaussian:
+    """Tests for _copularnd_gaussian function."""
+
+    def test_copularnd_gaussian_output_shape(self):
+        """Test that output shape matches (n, d) where d is cov_matrix dimension."""
+        n = 100
+        d = 5
+        cov_matrix = np.eye(d)
+        
+        U = copula._copularnd_gaussian(n, cov_matrix, random_state=42)
+        
+        assert U.shape == (n, d)
+
+    def test_copularnd_gaussian_uniform_bounds(self):
+        """Test that output values are within [0, 1] (uniform distribution)."""
+        n = 1000
+        d = 3
+        cov_matrix = np.eye(d)
+        
+        U = copula._copularnd_gaussian(n, cov_matrix, random_state=42)
+        
+        assert np.all(U >= 0)
+        assert np.all(U <= 1)
+
+    def test_copularnd_gaussian_reproducibility(self):
+        """Test that the same seed produces identical results."""
+        n = 100
+        d = 4
+        cov_matrix = np.eye(d)
+        seed = 42
+        
+        U1 = copula._copularnd_gaussian(n, cov_matrix, random_state=seed)
+        U2 = copula._copularnd_gaussian(n, cov_matrix, random_state=seed)
+        
+        assert np.allclose(U1, U2)
+
+    def test_copularnd_gaussian_different_seeds_differ(self):
+        """Test that different seeds produce different results."""
+        n = 100
+        d = 3
+        cov_matrix = np.eye(d)
+        
+        U1 = copula._copularnd_gaussian(n, cov_matrix, random_state=42)
+        U2 = copula._copularnd_gaussian(n, cov_matrix, random_state=123)
+        
+        assert not np.allclose(U1, U2)
+
+    def test_copularnd_gaussian_correlation_preserved(self):
+        """Test that correlation structure is preserved in copula samples."""
+        n = 5000
+        # Create a covariance matrix with strong correlation
+        rho = 0.8
+        cov_matrix = np.array([[1.0, rho],
+                               [rho, 1.0]])
+        
+        U = copula._copularnd_gaussian(n, cov_matrix, random_state=42)
+        
+        # Compute Spearman rank correlation (appropriate for copulas)
+        corr, _ = spearmanr(U[:, 0], U[:, 1])
+        
+        # Should be positive correlation similar to rho
+        assert corr > 0.7  # Relaxed tolerance due to sampling
+
+    def test_copularnd_gaussian_independence_preserved(self):
+        """Test that independent variables remain approximately independent."""
+        n = 5000
+        # Create an identity covariance matrix (independent)
+        cov_matrix = np.eye(3)
+        
+        U = copula._copularnd_gaussian(n, cov_matrix, random_state=42)
+
+        corr_12, _ = spearmanr(U[:, 0], U[:, 1])
+        corr_13, _ = spearmanr(U[:, 0], U[:, 2])
+        corr_23, _ = spearmanr(U[:, 1], U[:, 2])
+        
+        # All correlations should be close to zero
+        assert abs(corr_12) < 0.1
+        assert abs(corr_13) < 0.1
+        assert abs(corr_23) < 0.1
+
+    def test_copularnd_gaussian_approximately_uniform(self):
+        """Test that marginals are approximately uniform (via KS test)."""
+        n = 5000
+        d = 2
+        cov_matrix = np.eye(d)
+        
+        U = copula._copularnd_gaussian(n, cov_matrix, random_state=42)
+
+        # Test each marginal
+        for i in range(d):
+            stat, pval = kstest(U[:, i], uniform(0, 1).cdf)
+            # p-value should be > 0.05 for uniform distribution
+            assert pval > 0.05
+
+    def test_copularnd_gaussian_identity_covariance(self):
+        """Test with identity covariance (special case)."""
+        n = 100
+        d = 2
+        cov_matrix = np.eye(d)
+        
+        U = copula._copularnd_gaussian(n, cov_matrix, random_state=42)
+        
+        assert U.shape == (n, d)
+        assert np.all(U >= 0) and np.all(U <= 1)
+
+    def test_copularnd_gaussian_large_covariance(self):
+        """Test with a larger covariance matrix."""
+        n = 100
+        d = 10
+        cov_matrix = np.eye(d)
+        
+        U = copula._copularnd_gaussian(n, cov_matrix, random_state=42)
+        
+        assert U.shape == (n, d)
+        assert np.all(U >= 0) and np.all(U <= 1)
+
+    def test_copularnd_gaussian_none_seed(self):
+        """Test that None seed works (uses random state)."""
+        n = 100
+        d = 3
+        cov_matrix = np.eye(d)
+        
+        U = copula._copularnd_gaussian(n, cov_matrix, random_state=None)
+        
+        assert U.shape == (n, d)
+        assert np.all(U >= 0) and np.all(U <= 1)
+
+
+class TestSpaceTimeCopula:
+    """Tests for _space_time_copula function."""
+
+    @staticmethod
+    def _create_simple_cdf():
+        """Create a simple CDF for testing (uniform over [0, 1])."""
+        cdf_x = np.linspace(0, 1, 100)
+        cdf = np.linspace(0, 1, 100)
+        return cdf_x, cdf
+
+    def test_space_time_copula_output_shape(self):
+        """Test that output shape matches input spacetime_dist shape."""
+        n = 50
+        d = 6  # 2 sites, 3 times
+        spacetime_dist = np.eye(d)  # Simple identity distance matrix
+        cdf_x, cdf = self._create_simple_cdf()
+        p = 0.5
+        
+        gen_csi = copula._space_time_copula(n, spacetime_dist, cdf_x, cdf, p, seed=42)
+        
+        assert gen_csi.shape == (n, d)
+
+    def test_space_time_copula_values_in_range(self):
+        """Test that generated CSI values are within the CDF range."""
+        n = 100
+        d = 4
+        spacetime_dist = np.eye(d)
+        cdf_x, cdf = self._create_simple_cdf()
+        cdf = np.linspace(0, 1, 100)
+        p = 0.5
+        
+        gen_csi = copula._space_time_copula(n, spacetime_dist, cdf_x, cdf, p, seed=42)
+        
+        assert np.all(gen_csi >= cdf_x.min())
+        assert np.all(gen_csi <= cdf_x.max())
+
+    def test_space_time_copula_reproducibility(self):
+        """Test that same seed produces identical results."""
+        n = 50
+        d = 4
+        spacetime_dist = np.eye(d)
+        cdf_x, cdf = self._create_simple_cdf()
+        p = 0.5
+        seed = 42
+        
+        gen_csi1 = copula._space_time_copula(n, spacetime_dist, cdf_x, cdf, p, seed=seed)
+        gen_csi2 = copula._space_time_copula(n, spacetime_dist, cdf_x, cdf, p, seed=seed)
+        
+        assert np.allclose(gen_csi1, gen_csi2)
+
+    def test_space_time_copula_different_seeds_differ(self):
+        """Test that different seeds produce different results."""
+        n = 50
+        d = 4
+        spacetime_dist = np.eye(d)
+        cdf_x, cdf = self._create_simple_cdf()
+        p = 0.5
+        
+        gen_csi1 = copula._space_time_copula(n, spacetime_dist, cdf_x, cdf, p, seed=42)
+        gen_csi2 = copula._space_time_copula(n, spacetime_dist, cdf_x, cdf, p, seed=123)
+        
+        assert not np.allclose(gen_csi1, gen_csi2)
+
+    def test_space_time_copula_correlation_decay(self):
+        """Test that correlation decays with distance parameter p."""
+        n = 1000
+        # Create a simple 2x2 block with partial correlation
+        spacetime_dist = np.array([[0.0, 1.0],
+                                   [1.0, 0.0]])
+        cdf_x, cdf = self._create_simple_cdf()
+        
+        # Small p: less decay, higher correlation
+        gen_csi_small_p = copula._space_time_copula(n, spacetime_dist, cdf_x, cdf, p=0.1, seed=42)
+        corr_small_p, _ = spearmanr(gen_csi_small_p[:, 0], gen_csi_small_p[:, 1])
+        
+        # Large p: more decay, lower correlation
+        gen_csi_large_p = copula._space_time_copula(n, spacetime_dist, cdf_x, cdf, p=2.0, seed=42)
+        corr_large_p, _ = spearmanr(gen_csi_large_p[:, 0], gen_csi_large_p[:, 1])
+        
+        # Larger p should result in lower correlation
+        assert abs(corr_small_p) > abs(corr_large_p)
