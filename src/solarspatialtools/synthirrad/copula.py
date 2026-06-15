@@ -317,8 +317,10 @@ def _copularnd_gaussian(n, cov_matrix, random_state=None):
 def downscale(times, e_pos, n_pos, cloud_spd, cloud_dir, mean_csi, params,
               seed=None, scale=True, noneg=True):
     """
-    Downscale the synthetic CSI for a position field using a downscaling. Based
-    on methods developed by Widen and Munkhammar [1].
+    Downscale the synthetic CSI for a position field using a copula. This
+    function produces a synthetic time series for stationary data, e.g. a
+    single hour or related time period. Method is based on approaches developed
+    by Widen and Munkhammar [1].
 
     Parameters
     ----------
@@ -402,8 +404,12 @@ def downscale(times, e_pos, n_pos, cloud_spd, cloud_dir, mean_csi, params,
 def downscale_multihour(times, e_pos, n_pos, cloud_spd, cloud_dir, mean_csi,
                         params, seed=None, scale=True, noneg=True):
     """
-    Downscale the synthetic CSI for a position field using a downscaling
+    Downscale the synthetic CSI for a position field using a copula. This
+    implementation allows for multiple hours to be computed in one call, with
+    different specification of cloud_spd, cloud_dir, mean_csi and params.
+
     Based on methods developed by Widen and Munkhammar [1].
+
     Parameters
     ----------
     times : pd.DatetimeIndex or list(pd.DatetimeIndex)

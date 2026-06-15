@@ -23,3 +23,21 @@ Generate a simulated field of clouds from which spatially distributed timeseries
             cloudfield_timeseries
 
 
+copula
+======
+
+Generate synthetic timeseries of kt values based on a spacetime copula model. This method was first described by Widen and Munkhammar [2] and utilizes Gaussian Copula statistical representations of the irradiance as a source for sub-interval downscaling.
+
+ [2] Widen, J. and Munkhammar, J., "Spatio-Temporal Downscaling of Hourly Solar irradiance Data Using Gaussian Copulas," 2019 IEEE 46th Photovoltaic Specialists Conference (PVSC), Chicago, IL, USA, 2019, pp. 3172-3178, doi: 10.1109/PVSC40753.2019.8980922.
+
+.. automodule:: solarspatialtools.synthirrad.copula
+
+
+    .. rubric:: Functions
+
+    .. autosummary::
+        :toctree: generated/
+
+            downscale
+            downscale_multihour
+
