@@ -11,6 +11,16 @@ from scipy.stats import norm
 # Specialists Conference (PVSC), Chicago, IL, USA, 2019, pp. 3172-3178,
 # doi: 10.1109/PVSC40753.2019.8980922.
 
+# Default fitting parameters as given by the paper in Table I
+DEFAULT_PARAMS = {
+    'comp': [0.8051, 7.3605, 0.7092],
+    'mean': [2.2928, 1.0801, 0.4532],
+    'sdevClear': [0.3512, 4.8414, 0.6442],
+    'sdevCloud': [0.1997, 5.0919, 0.3863],
+    'corr_quadr': 0.0043
+}
+
+
 def _sigmoid(x, a, c):
     """
     Generate a sigmoid membership function. Equation 11 from the paper.
@@ -141,6 +151,72 @@ def _inverse_sample(x, cdf, r):
     return s.reshape(r_arr.shape)
 
 
+def _process_params(meanCSI, params):
+    """
+    Convert the params dict into the necessary values for subsequent parts of
+    the model.
+
+    This represents equations 9-14 of the paper [1].
+
+    Parameters
+    ----------
+    meanCSI : float
+        The mean CSI for the hour, used to compute the parameters of the GMM.
+    params : dict
+        The parameters of the model, containing at least:
+        - 'comp': [a, c] parameters for the sigmoid function that determines
+            the cloudy component weight based on meanCSI.
+        - 'mean': [m_cloud, m_clear, c] parameters for computing the means of
+            the cloud and clear components based on meanCSI and the cloudy
+            component weight.
+        - 'sdevClear': [sdev_clear_max, a, c] parameters for computing the
+            standard deviation of the clear component based on meanCSI.
+        - 'sdevCloud': [sdev_cloud_max, a, c] parameters for computing the
+            standard deviation of the cloud component based on meanCSI.
+
+    Returns
+    -------
+    list
+        The means (mu1, mu2) for the cloud and clear gmm components, shape (2,)
+
+    list
+        The weights (w1, w2) for the cloud and clear gmm components, shape (2,)
+
+    list
+        The variances (sig1**2, sig2**2) for the cloud and clear gmm
+        components, shape (2,)
+
+    list
+        The exponential decay parameter for the copula, k' in the paper
+
+    References
+    ----------
+    [1] Widen, J. and Munkhammar, J., "Spatio-Temporal Downscaling of Hourly
+    Solar irradiance Data Using Gaussian Copulas," 2019 IEEE 46th Photovoltaic
+    Specialists Conference (PVSC), Chicago, IL, USA, 2019, pp. 3172-3178,
+    doi: 10.1109/PVSC40753.2019.8980922.
+    """
+    # Weights - 1 cloudy, 2 clear
+    w1 = (1 - params['comp'][0] * _sigmoid(meanCSI, params['comp'][1], params['comp'][2]))
+    w2 = 1 - w1
+
+    # GMM Means - 1 cloudy, 2 clear (equations 12 & 13 in the paper)
+    # Note that equation 12 is actually a mistake - the fit params provided
+    # by the paper are actually the fit params for the clear mean, not cloudy
+    mu2 = (params['mean'][0] * w1 * meanCSI + params['mean'][1] * (1 - w1) * (meanCSI - params['mean'][2]))
+    mu1 = (meanCSI - w2 * mu2) / w1
+
+    # GMM Std devs - Eq 14
+    sig2 = params['sdevClear'][0] * (1 - _sigmoid(meanCSI, params['sdevClear'][1],params['sdevClear'][2]))
+    sig1 = params['sdevCloud'][0] * _sigmoid(meanCSI, params['sdevCloud'][1], params['sdevCloud'][2])
+
+    mu = [mu1, mu2]
+    w = [w1, w2]
+    variances = [sig1**2, sig2**2]
+    k = _exponential_decay_parameter(meanCSI, params['corr_quadr'])
+    return mu, w, variances, k
+
+
 def _solar_gmm(csi, meanCSI, params, debug=False):
     """
     Compute the parameters of a gaussian mixture model of clear and cloudy
@@ -176,25 +252,11 @@ def _solar_gmm(csi, meanCSI, params, debug=False):
         The exponential decay parameter for the copula, which controls how
         quickly the correlation decays with distance.
     """
-    comp_cloud = (1 -
-                  params['comp'][0] *
-                  _sigmoid(meanCSI, params['comp'][1], params['comp'][2]))
-    comp_clear = 1 - comp_cloud
-    mean_clear = (params['mean'][0] * comp_cloud * meanCSI +
-                  params['mean'][1] * (1 - comp_cloud) * (meanCSI - params['mean'][2]))
-    mean_cloud = (meanCSI - comp_clear * mean_clear) / comp_cloud
-    sdev_clear = params['sdevClear'][0] * (1 - _sigmoid(meanCSI, params['sdevClear'][1],params['sdevClear'][2]))
-    sdev_cloud = params['sdevCloud'][0] * _sigmoid(meanCSI, params['sdevCloud'][1], params['sdevCloud'][2])
+    mu, w, variances, k = _process_params(meanCSI, params)
 
-    mu = [mean_cloud, mean_clear]
-    p = [comp_cloud, comp_clear]
-    vars = [sdev_cloud**2, sdev_clear**2]
+    pdf_val, cdf_val = _gmdistribution(csi, mu, variances, w, debug)
 
-    pdf_val, cdf_val = _gmdistribution(csi, mu, vars, p, debug)
-
-    p = _exponential_decay_parameter(meanCSI, params['corr_quadr'])
-
-    return pdf_val, cdf_val, p
+    return pdf_val, cdf_val, k
 
 
 def _exponential_decay_parameter(K, p):
@@ -221,8 +283,11 @@ def _exponential_decay_parameter(K, p):
         decay.
     """
     k = p * K * (1-K)
-    if k < 10**-5:
-        k = 10**-5
+    try:
+        if k < 10**-5:
+            k = 10**-5
+    except ValueError:
+        k[k < 10**-5] = 10**-5
     return k
 
 

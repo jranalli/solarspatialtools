@@ -72,6 +72,42 @@ class TestGMDistribution:
             assert y == approx(y_e, abs=0.001)
 
 
+class TestProcessPrarams:
+    _params = {
+        'comp': [0.8051, 7.3605, 0.7092],
+        'mean': [2.2928, 1.0801, 0.4532],
+        'sdevClear': [0.3512, 4.8414, 0.6442],
+        'sdevCloud': [0.1997, 5.0919, 0.3863],
+        'corr_quadr': 0.0043
+    }
+
+    _expect = {
+        'mean_csi': 0.5,
+        'mu': [0.4187, 0.9906],
+        'w': [0.8578, 0.1422],
+        'variance': [0.01638, 0.055001],
+        'k': 0.001075
+    }
+
+    def test_default_params(self):
+        assert copula.DEFAULT_PARAMS == self._params
+
+    def test_process_params_known_values(self):
+        mu, w, variance, k = copula._process_params(self._expect['mean_csi'], self._params)
+        assert mu == approx(self._expect['mu'], abs=1e-4)
+        assert w == approx(self._expect['w'], abs=1e-4)
+        assert np.sum(w) == 1
+        assert variance == approx(self._expect['variance'], abs=1e-5)
+        assert k == approx(self._expect['k'], abs=1e-5)
+
+    def test_process_params_multi_inp(self):
+        mu, w, variance, k = copula._process_params(np.array([self._expect['mean_csi'],self._expect['mean_csi']]), self._params)
+        assert mu == approx(np.array([self._expect['mu'],self._expect['mu']]).T, abs=1e-4)
+        assert w == approx(np.array([self._expect['w'],self._expect['w']]).T, abs=1e-4)
+        assert variance == approx(np.array([self._expect['variance'],self._expect['variance']]).T, abs=1e-5)
+        assert k == approx(np.array([self._expect['k'],self._expect['k']]), abs=1e-5)
+
+
 class TestSolarGMM:
     _params = {
         'comp': [0.8051, 7.3605, 0.7092],
