@@ -2,18 +2,10 @@ import numpy as np
 import pandas as pd
 
 from solarspatialtools import spatial
-from solarspatialtools.synthirrad.copula import downscale, downscale_multihour
+from solarspatialtools.synthirrad.copula import downscale, downscale_multihour, DEFAULT_PARAMS
 
 
 def matlab_compare():
-
-    param = {
-        'comp': [0.8051, 7.3605, 0.7092],
-        'mean': [2.2928, 1.0801, 0.4532],
-        'sdevClear': [0.3512, 4.8414, 0.6442],
-        'sdevCloud': [0.1997, 5.0919, 0.3863],
-        'corr_quadr': 0.0043
-    }
 
     # Cloud speed and direction in radians
     cs = np.array([5, 5, 5, 5, 5, 5])
@@ -46,7 +38,7 @@ def matlab_compare():
     #     c.append(cm)
     # c = np.concatenate(c, axis=0)
 
-    c = downscale_multihour(times, Epos, Npos, cs, cd, hcsi, param, seed=42, scale=scale, noneg=noneg)
+    c = downscale_multihour(times, Epos, Npos, cs, cd, hcsi, DEFAULT_PARAMS, seed=42, scale=scale, noneg=noneg)
 
 
     import matplotlib.pyplot as plt
@@ -66,14 +58,6 @@ def matlab_compare():
 
 def spatial_compare():
 
-    param = {
-        'comp': [0.8051, 7.3605, 0.7092],
-        'mean': [2.2928, 1.0801, 0.4532],
-        'sdevClear': [0.3512, 4.8414, 0.6442],
-        'sdevCloud': [0.1997, 5.0919, 0.3863],
-        'corr_quadr': 0.0043
-    }
-
     # Cloud speed and direction in radians
     cs = 1
     cd = 0
@@ -86,7 +70,7 @@ def spatial_compare():
 
     times = pd.date_range(start='2024-01-01 00:00:00', end='2024-01-01 00:59:59', freq='15s')
 
-    c = downscale(times, Epos, Npos, cs, cd, hcsi, param, seed=42, scale=True,
+    c = downscale(times, Epos, Npos, cs, cd, hcsi, DEFAULT_PARAMS, seed=42, scale=True,
                   noneg=True)
 
     import matplotlib.pyplot as plt

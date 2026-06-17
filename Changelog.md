@@ -79,6 +79,7 @@ site itself.
 - Implement the `synthirrad.cloudfield` module
 - Tests and demos for the new package
 # Version 0.5.2 - TBD
-- Implement the synthirrad.copula module
+- Implement the `synthirrad.copula` module based on Widen and Munkhammar (2019)
 - Tests and demos for the new package
 - Bugfix - `spatial.latlon2lcs` was not handling arrays
+- Introduce `spatial.lla2flat` and `spatial.spacetime_distances` to support copula implementation
