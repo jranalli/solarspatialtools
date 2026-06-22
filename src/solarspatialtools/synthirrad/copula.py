@@ -9,7 +9,7 @@ from scipy.stats import norm
 # [1] Widen, J. and Munkhammar, J., "Spatio-Temporal Downscaling of Hourly
 # Solar irradiance Data Using Gaussian Copulas," 2019 IEEE 46th Photovoltaic
 # Specialists Conference (PVSC), Chicago, IL, USA, 2019, pp. 3172-3178,
-# doi: 10.1109/PVSC40753.2019.8980922.
+# doi: https://dx.doi.org/10.1109/PVSC40753.2019.8980922.
 
 # Default fitting parameters as given by the paper in Table I
 DEFAULT_PARAMS = {
@@ -442,7 +442,7 @@ def downscale(times, e_pos, n_pos, cloud_spd, cloud_dir, mean_csi, params,
     [1] Widen, J. and Munkhammar, J., "Spatio-Temporal Downscaling of Hourly
     Solar irradiance Data Using Gaussian Copulas," 2019 IEEE 46th Photovoltaic
     Specialists Conference (PVSC), Chicago, IL, USA, 2019, pp. 3172-3178,
-    doi: 10.1109/PVSC40753.2019.8980922.
+    doi: https://dx.doi.org/10.1109/PVSC40753.2019.8980922.
     """
     csi = np.arange(-2, 2, 0.01)
 
@@ -535,7 +535,7 @@ def downscale_multihour(times, e_pos, n_pos, cloud_spd, cloud_dir, mean_csi,
     [1] Widen, J. and Munkhammar, J., "Spatio-Temporal Downscaling of Hourly
     Solar irradiance Data Using Gaussian Copulas," 2019 IEEE 46th Photovoltaic
     Specialists Conference (PVSC), Chicago, IL, USA, 2019, pp. 3172-3178,
-    doi: 10.1109/PVSC40753.2019.8980922.
+    doi: https://dx.doi.org/10.1109/PVSC40753.2019.8980922.
     """
     n_hours = len(mean_csi)
 

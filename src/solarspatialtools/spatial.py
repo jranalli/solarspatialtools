@@ -223,7 +223,8 @@ def lcs2latlon(east, north, origin_lat, origin_lon, zone=None):
 
 def lla2flat(lat, lon, latref, lonref, method="matlab"):
     """
-    Convert from latitude/longitude to East and North in meters based on a local coordinate system.
+    Convert from latitude/longitude to East and North in meters based on a
+    local coordinate system.
 
     Parameters
     ----------
@@ -236,8 +237,10 @@ def lla2flat(lat, lon, latref, lonref, method="matlab"):
     lonref : numeric
         reference longitude
     method : str
-        "matlab" to follow the algorithm specified by Matlab lla2flat (neglecting altitude).
-        "tmerc" to use a transverse mercator with local longitude for the projection equal to lonref
+        - "matlab": follow the algorithm specified by Matlab lla2flat
+            (neglecting altitude) [1][2].
+        - "tmerc":  use a transverse mercator with local longitude for the
+            projection equal to lonref
 
     References
     ----------
@@ -552,7 +555,8 @@ def compute_intersection(A, B):
 def spacetime_distances(x, y, times, cs, cd):
     """
     Compute the pairwise spatio-temporal distances between all site-time
-    combinations, accounting for cloud drift.
+    combinations, accounting for cloud drift. Utilized as part of the copula
+    synthetic irradiance method. See `solarspatialtools.synthirrad.copula`.
 
     Parameters
     ----------
