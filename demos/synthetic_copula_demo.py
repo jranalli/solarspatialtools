@@ -82,30 +82,48 @@ def spatial_compare():
 def distance_confirm():
     import matplotlib.pyplot as plt
 
-    n = 60
+    n = 60  # Num pixels in each axis
+    dt = 10  # Time step in seconds
+    cloud_dir = 0  # Cloud direction (east)
+    cloud_spd_vals = [10, 25, 40]  # cloud speed in m/x
+    mean_csi_vals = [0.5, 0.7, 0.9]  # mean clear-sky index
 
-    cloud_spd = 10
-    dt = 10
-    cloud_dir = 0
-
-    mean_csi = 0.9
-
+    # Compute the time vector to maintain a size of n, with a spacing of dt
     end_time = (pd.to_timedelta(f'{dt}s') * n).total_seconds()
-
     times = pd.date_range(start='2024-01-01 00:00:00',
                           end=f'2024-01-01 {int(end_time // 3600):02d}:{int((end_time - (end_time // 3600) * 3600) // 60):02d}:{int(end_time - (end_time // 60) * 60):02d}',
                           freq=f'{dt}s')
 
-    e_pos = np.zeros(len(times))
-    n_pos = np.arange(len(times)) * cloud_spd * dt  # cld_spd * dt
+    fig, axes = plt.subplots(3, 3, figsize=(12, 12), constrained_layout=True)
+    tick_idx = np.arange(len(times))[::max(1, n // 5)]
 
-    c = downscale(times, e_pos, n_pos, cloud_spd, cloud_dir, mean_csi,
-                  DEFAULT_PARAMS, seed=42, scale=True, noneg=True)
+    for row, mean_csi in enumerate(mean_csi_vals):
+        for col, cloud_spd in enumerate(cloud_spd_vals):
+            # Compute the x & y position values such that we form a north-south rake with perpendicular motion
+            # The vertical spacing should be equal to the spatiotemporal spacing implied by advection.
+            e_pos = np.zeros(len(times))
+            n_pos = np.arange(len(times)) * cloud_spd * dt
 
+            # Downscale
+            c = downscale(times, e_pos, n_pos, cloud_spd, cloud_dir, mean_csi,
+                          DEFAULT_PARAMS, seed=42, scale=True, noneg=True)
 
-    plt.imshow(c, vmin=0.2, vmax=1.2)
-    plt.axis('equal')
-    plt.colorbar()
+            ax = axes[row, col]
+            im = ax.imshow(c, vmin=0, vmax=1.3)
+            ax.set_aspect('equal')
+            ax.set_xticks(tick_idx)
+            ax.set_yticks(tick_idx)
+            ax.set_xticklabels(n_pos[tick_idx] / 1000)
+            ax.set_yticklabels(n_pos[tick_idx] / 1000)
+            ax.set_title(f'cloud_spd={cloud_spd} m/s, mean_csi={mean_csi}')
+
+    for ax in axes[-1, :]:
+        ax.set_xlabel('Distance (km)')
+
+    for ax in axes[:, 0]:
+        ax.set_ylabel('Distance (km)')
+
+    fig.colorbar(im, ax=axes, label='Clear-sky index', shrink=0.85);
     plt.show()
 
 if __name__ == '__main__':
