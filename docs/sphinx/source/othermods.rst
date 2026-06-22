@@ -36,6 +36,7 @@ spatial module
 
             latlon2utm
             utm2latlon
+            lla2flat
             project_vectors
             compute_vectors
             compute_intersection

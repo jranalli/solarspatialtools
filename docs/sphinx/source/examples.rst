@@ -30,6 +30,7 @@ Synthetic Irradiance Examples
    :maxdepth: 1
 
    demos/synthetic_clouds_demo
+   demos/synthetic_copula_demo
 
 Other Examples
 --------------

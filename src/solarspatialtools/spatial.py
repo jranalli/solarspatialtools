@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from fontTools.misc.testTools import parseXML
 from pyproj import Proj
 
 
@@ -148,8 +149,25 @@ def latlon2lcs(lat, lon, origin_lat, origin_lon, zone=None):
         The Easting and Northing of the target point in the LCS coordinates
     """
     # Convert both coordinates to UTM
-    e_i, n_o, _ = latlon2utm(origin_lat, origin_lon, zone=zone)
-    e_t, n_t, _ = latlon2utm(lat, lon, zone=zone)
+    utm_i = latlon2utm(origin_lat, origin_lon, zone=zone)
+    utm_t = latlon2utm(lat, lon, zone=zone)
+
+    # Extract E and N from results (handle scalar, array, and DataFrame returns)
+    if isinstance(utm_i, pd.DataFrame):
+        e_i, n_o = utm_i['E'], utm_i['N']
+    else:
+        if np.ndim(utm_i) == 1:
+            e_i, n_o, _ = utm_i
+        else:
+            e_i, n_o = utm_i[:, 0], utm_i[:, 1]
+
+    if isinstance(utm_t, pd.DataFrame):
+        e_t, n_t = utm_t['E'], utm_t['N']
+    else:
+        if np.ndim(utm_t) == 1:
+            e_t, n_t, _ = utm_t
+        else:
+            e_t, n_t = utm_t[:, 0], utm_t[:, 1]
 
     # Shift by origin to convert to LCS
     # (LCS is UTM, re-zeroed to the origin's coordinates)
@@ -201,6 +219,64 @@ def lcs2latlon(east, north, origin_lat, origin_lon, zone=None):
     # Calculate
     lat, lon = utm2latlon(e_t, n_t, zone, south)
     return lat, lon
+
+
+def lla2flat(lat, lon, latref, lonref, method="matlab"):
+    """
+    Convert from latitude/longitude to East and North in meters based on a
+    local coordinate system.
+
+    Parameters
+    ----------
+    lat : np.array
+        latitudes
+    lon : np.array
+        longitudes
+    latref : numeric
+        reference latitude
+    lonref : numeric
+        reference longitude
+    method : str
+        - "matlab": follow the algorithm specified by Matlab lla2flat
+            (neglecting altitude) [1][2].
+        - "tmerc":  use a transverse mercator with local longitude for the
+            projection equal to lonref
+
+    References
+    ----------
+    [1] Matlab Documentation - lla2flat - Convert from geodetic to flat Earth.
+            https://www.mathworks.com/help/aerotbx/ug/lla2flat.html
+    [2] Engee Documentation - LLA to Flat Earth.
+            https://engee.com/helpcenter/stable/en/aerospace-axes-transformations/lla-to-flat-earth.html
+    """
+    if method == "matlab":
+        mu0 = np.deg2rad(latref)
+        lam0 = np.deg2rad(lonref)
+
+        dmu = np.deg2rad(lat) - mu0
+        dlam = np.deg2rad(lon) - lam0
+
+        r_earth = 6378137.0  # WGS84 Earth radius in meters, via wikipedia
+        f = 1/298.257223563  # WGS84 flattening factor
+
+        Rn = r_earth / np.sqrt (1 - (2 * f - f ** 2) * np.sin(mu0) ** 2)
+        Rm = Rn * ((1 - (2 * f - f ** 2)) / (1 - (2 * f - f ** 2) * np.sin(mu0) ** 2))
+
+        dN = Rm * dmu
+        dE = Rn * np.cos(mu0) * dlam
+
+        return dE, dN
+
+    elif method == "tmerc":
+        # project with a local transverse mercator
+        proj = Proj(proj='tmerc', lat_0=latref, lon_0=lonref, k=1,
+                    x_0=0, y_0=0, ellps='WGS84', datum='WGS84',
+                    units='m', preserve_units=True)
+        E, N = proj(lon, lat)
+        return E, N
+
+    else:
+        raise ValueError("Unknown method specified.")
 
 
 def dot(vec_a, vec_b):
@@ -474,3 +550,64 @@ def compute_intersection(A, B):
     C = np.array([cx, cy]).T
 
     return C
+
+
+def spacetime_distances(x, y, times, cs, cd):
+    """
+    Compute the pairwise spatio-temporal distances between all site-time
+    combinations, accounting for cloud drift. Utilized as part of the copula
+    synthetic irradiance method. See `solarspatialtools.synthirrad.copula`.
+
+    Parameters
+    ----------
+    x : numeric
+        An indexable array of x coordinates of shape (n_sites,)
+
+    y : numeric
+        An indexable array of y coordinates of shape (n_sites,)
+
+    times : pd.DatetimeIndex
+        A DatetimeIndex of shape (n_times,) representing the time points for
+        which to compute distances.
+
+    cs : float
+        The cloud speed in the same units as the spatial coordinates per
+        second (e.g., meters/second).
+
+    cd : float
+        The cloud direction in radians, measured CCW from east
+
+    Returns
+    -------
+    D: np.array
+        The pairwise distances between all site-time combinations, accounting
+        for cloud drift. The output will be a 2D array of shape
+        (n_sites*n_times, n_sites*n_times) where D[i, j] is the distance
+        between the i-th and j-th site-time combination.
+    """
+
+    # Calculate all times relative to the initial time
+    t0 = times[0]
+    dur = (times-t0).total_seconds().values
+
+    # Build a time-dependent drift term and broadcast against site coordinates.
+    x_drift = np.asarray(cs) * dur * np.cos(np.asarray(cd))
+    y_drift = np.asarray(cs) * dur * np.sin(np.asarray(cd))
+
+    # Create a spacetime redefinition of the spatial field -
+    # dims are [n_sites, n_times]
+    X = np.asarray(x)[:, None] - np.asarray(x_drift)[None, :]
+    Y = np.asarray(y)[:, None] - np.asarray(y_drift)[None, :]
+    X = X.T  # convert to [n_times, n_sites]
+    Y = Y.T
+
+    # Flatten the values
+    xf = np.asarray(X).reshape(-1, order='F')
+    yf = np.asarray(Y).reshape(-1, order='F')
+
+    # Calculate the x- and y- spacetime separations, and find magnitude.
+    dx = xf[:, None] - xf[None, :]
+    dy = yf[:, None] - yf[None, :]
+    D = np.sqrt(dx**2 + dy**2)
+
+    return D
