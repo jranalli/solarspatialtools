@@ -12,7 +12,7 @@ def matlab_compare():
     cd = np.array([0, 0, 0, 0, 0, 0]) * 2 * np.pi / 360
 
     # Hourly clearsky
-    hcsi = np.array([0.52,0.71,0.5,0.84,0.63,0.11])
+    hcsi = np.array([0.52,0.71,0.5,.995,0.63,0.11])
 
     # lat
     lat = np.array([21.31236, 21.31303, 21.32357])
