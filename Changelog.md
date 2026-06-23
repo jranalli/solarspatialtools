@@ -83,3 +83,5 @@ site itself.
 - Tests, demos and docs for the new method
 - Bugfix - `spatial.latlon2lcs` was not handling arrays
 - Introduce `spatial.lla2flat` and `spatial.spacetime_distances` to support copula implementation
+- # Version 0.5.2a - June 22, 2026
+- Fix failed documentation build.

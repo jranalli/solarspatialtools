@@ -413,14 +413,14 @@ def downscale(times, e_pos, n_pos, cloud_spd, cloud_dir, mean_csi, params,
     params : dict
         The parameters of the model, containing at least:
         - 'comp': [a, c] parameters for the sigmoid function that determines
-            the cloudy component weight based on meanCSI.
+        the cloudy component weight based on meanCSI.
         - 'mean': [m_cloud, m_clear, c] parameters for computing the means of
-            the cloud and clear components based on meanCSI and the cloudy
-            component weight.
+        the cloud and clear components based on meanCSI and the cloudy
+        component weight.
         - 'sdevClear': [sdev_clear_max, a, c] parameters for computing the
-            standard deviation of the clear component based on meanCSI.
+        standard deviation of the clear component based on meanCSI.
         - 'sdevCloud': [sdev_cloud_max, a, c] parameters for computing the
-            standard deviation of the cloud component based on meanCSI.
+        standard deviation of the cloud component based on meanCSI.
 
     seed : int or None
         Seed for the random number generator.
@@ -505,14 +505,14 @@ def downscale_multihour(times, e_pos, n_pos, cloud_spd, cloud_dir, mean_csi,
     params : dict or list(dict)
         The parameters of the model, containing at least:
         - 'comp': [a, c] parameters for the sigmoid function that determines
-            the cloudy component weight based on meanCSI.
+        the cloudy component weight based on meanCSI.
         - 'mean': [m_cloud, m_clear, c] parameters for computing the means
-            of the cloud and clear components based on meanCSI and the
-            cloudy component weight.
+        of the cloud and clear components based on meanCSI and the
+        cloudy component weight.
         - 'sdevClear': [sdev_clear_max, a, c] parameters for computing the
-            standard deviation of the clear component based on meanCSI.
+        standard deviation of the clear component based on meanCSI.
         - 'sdevCloud': [sdev_cloud_max, a, c] parameters for computing the
-            standard deviation of the cloud component based on meanCSI.
+        standard deviation of the cloud component based on meanCSI.
 
     seed : int or None
         Seed for the random number generator.
