@@ -85,3 +85,5 @@ site itself.
 - Introduce `spatial.lla2flat` and `spatial.spacetime_distances` to support copula implementation
 - # Version 0.5.2a - June 22, 2026
 - Fix failed documentation build.
+- # Version 0.5.3 - Aug 4, 2026
+- Adjust dt calculations in `stats` package to use median. 

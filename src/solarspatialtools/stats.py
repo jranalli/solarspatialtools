@@ -188,7 +188,7 @@ def variability_score(series, tau=1, moving_avg=True, pct=False):
     Energy 118, 327–337 (2015). https://www.osti.gov/pages/biblio/1497655
     """
     if moving_avg and tau > 1:
-        dt = (series.index[1] - series.index[0]).total_seconds()
+        dt = np.nanmedian(series.index.diff().total_seconds())
         rs = series.resample(str(int(tau * dt)) + 's').mean()
         return variability_score(rs, tau=1, moving_avg=False, pct=pct)
     if pct:  # Scale to a percentage of STC and multiply by 100 (Lave et al)
@@ -238,12 +238,12 @@ def variability_index(ghi, clearsky, moving_avg_tau=1, norm=False):
         raise TypeError('series must be a pandas Series or DataFrame')
 
     if moving_avg_tau > 1:
-        dti = (ghi.index[1] - ghi.index[0]).total_seconds()
+        dti = np.nanmedian(ghi.index.diff().total_seconds())
         sample_pd = str(int(moving_avg_tau*dti))+'s'
         rs = ghi.resample(sample_pd).mean()
         cs = clearsky.resample(sample_pd).mean()
         return variability_index(rs, cs, moving_avg_tau=1, norm=norm)
-    dt = (ghi.index[1] - ghi.index[0]).total_seconds() / 60
+    dt = np.nanmedian(ghi.index.diff().total_seconds()) / 60
     num = np.sqrt(ghi.diff() ** 2 + dt ** 2).sum(axis=0)
     den = np.sqrt(clearsky.diff() ** 2 + dt ** 2).sum(axis=0)
     if norm:  # Stein reports VI_dt = VI_1min/sqrt(dt)
@@ -294,7 +294,7 @@ def darr(series, tau=1, moving_avg=True, pct=False):
         raise TypeError('series must be a pandas Series or DataFrame')
 
     if moving_avg and tau > 1:
-        dt = (series.index[1] - series.index[0]).total_seconds()
+        dt = np.nanmedian(series.index.diff().total_seconds())
         rs = series.resample(str(int(tau * dt)) + 's').mean()
         # Rerun it without MA
         return darr(rs, tau=1, moving_avg=False, pct=pct)
