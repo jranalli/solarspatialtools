@@ -495,6 +495,10 @@ def _pairwise_qc(pairs, spacing, sigs, delay, peak_corr, mean_corr,
     # Zero lag Reject sensor pairs with no delay
     pair_flags[delay == 0] = Flag.NOLAG
 
+    # Reject sensor pairs with nan correlation
+    pair_flags[np.isnan(peak_corr)] = Flag.LOWCORR
+    pair_flags[np.isnan(mean_corr)] = Flag.LOWCORR
+
     # Signals are extremely overcast
     ktlim = options['ktlim']
     ktinds = np.bitwise_or(np.nanmax(A, axis=0) < ktlim,

@@ -86,4 +86,6 @@ site itself.
 - # Version 0.5.2a - June 22, 2026
 - Fix failed documentation build.
 - # Version 0.5.3 - Aug 4, 2026
-- Adjust dt calculations in `stats` package to use median. 
+- Adjust dt calculations in `stats` package to use median.
+- # Version 0.5.4 - Aug 13, 2026
+- Bugfix for CMV calculation in `cmv` package to handle NaN correlation values.
