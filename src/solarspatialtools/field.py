@@ -94,10 +94,11 @@ def compute_predicted_position(dfs, pos_utm, ref, cld_vecs=None,
     for df, cld_vec in zip(dfs, cld_vecs):
 
         # Get the pairwise delays
-        delay, coh = compute_delays(df, ref, navgs=navgs,
-                                    coh_limit=coh_limit,
-                                    freq_limit=freq_limit,
-                                    method=delay_method)
+        delay, extras = signalproc.compute_delays_tf(df[ref], df, navgs=navgs,
+                                                     coh_limit=coh_limit,
+                                                     freq_limit=freq_limit,
+                                                     method=delay_method)
+        coh = extras['mean_coh']
 
         # Convert them to distances along the cloud motion vector
         delay_dist = -delay * spatial.magnitude(cld_vec)
@@ -203,36 +204,16 @@ def compute_delays(df, ref, navgs=5, coh_limit=0.6, freq_limit=0.02,
         The average coherence for each transfer function within the window.
     """
 
-    # Compute all TFs
-    tf, tfcoh = signalproc.averaged_tf(df[ref], df, navgs=navgs, overlap=0.5,
-                                       window='hamming', detrend=None)
+    import warnings
+    warnings.warn("Warning: function signalproc.compute_delays() is deprecated. "
+                  "Use signalproc.compute_delays_tf instead. Comparable call signature is: "
+                  "delays, extras = signalproc.compute_delays_tf(df[ref], df, navgs, coh_limit, freq_limit, method, overlap=0.5, window='hamming')", DeprecationWarning, stacklevel=2)
 
-    if method == "fit":  # A looping method
-        delay = np.zeros_like(df.columns, dtype=float)
-        coh = np.zeros_like(df.columns, dtype=float)
-        for i, col in enumerate(tf.columns):
-            tf_i = tf[col]
-            coh_i = tfcoh[col]
-
-            # Find the time delay from the TF phase
-            delay[i], ix = signalproc.tf_delay(tf_i, coh_i,
-                                               coh_limit=coh_limit,
-                                               freq_limit=freq_limit,
-                                               method='fit')
-
-            # How good was the coherence? Average across TF
-            tfsub = coh_i[tf.index < freq_limit]
-            coh[i] = np.nansum(tfsub.values) / len(tfsub)
-
-    elif method == "multi":  # The most efficient method
-        delay, ix = signalproc.tf_delay(tf, tfcoh, coh_limit=coh_limit,
-                                        freq_limit=freq_limit, method='multi')
-        freq_ix = tf.index < freq_limit
-        coh = np.nansum(tfcoh.values[freq_ix, :], axis=0) / np.nansum(freq_ix,
-                                                                      axis=0)
-    else:
-        raise ValueError(f"Invalid method: {method}")
-    return delay, coh
+    delays, extras = signalproc.compute_delays_tf(df[ref], df, navgs,
+                                                  coh_limit, freq_limit,
+                                                  method, overlap=0.5,
+                                                  window='hamming')
+    return delays, extras['mean_coh']
 
 
 def remap_positions(data, remap, columns=None):

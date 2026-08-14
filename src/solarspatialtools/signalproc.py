@@ -221,6 +221,21 @@ def averaged_tf(input_tsig, output_tsig,
     Calculate a transfer function between two signals, along with their
     coherence.
 
+    Exact behavior varies based on number of parameter columns, N:
+    - NxN - if both `input_tsig` and `output_tsig` are DataFrames with the same
+    number of columns, each column is treated as a paired signal and the
+    result is computed column-wise: column i of the output corresponds to
+    the transfer function between `input_tsig.iloc[:, i]` and
+    `output_tsig.iloc[:, i]`. This produces N columns of result each with
+    distinct output/input tfs based on the incoming columns.
+    - Nx1 or 1xN - if one of the parameters is a single-column DataFrame
+    (or Series) and the other is a multi-column DataFrame, the transfer
+    function is computed by broadcasting between the single-column input and
+    each column of the multi-column output or vice versa, producing N columns
+    of result.
+    - NxM (N ≠ M, both > 1) - Disallowed - if both inputs are multi-column
+    DataFrames with different numbers of columns, a ValueError is raised.
+
     Parameters
     ----------
     input_tsig : numeric
@@ -278,7 +293,8 @@ def averaged_tf(input_tsig, output_tsig,
     elif len(in_cols) == 1:
         cols = [f"{in_cols[0]}_{out_cols[i]}" for i in range(len(out_cols))]
     else:
-        raise RuntimeError("Shouldn't Be Possible")
+        raise ValueError("Input and output columns must either be the same "
+                         "length, or one must be a single column.")
 
     nperseg = int(input_tsig.shape[1] // navgs)
     noverlap = int(nperseg * overlap)
@@ -690,6 +706,105 @@ def compute_delays(ts_in, ts_out, mode='loop', scaling='coeff'):
 
     # Sometimes produce erroneous delay for uncorrelated values
     delay[extras['peak_corr'] < 1e-10] = 0
+
+    return delay, extras
+
+
+def compute_delays_tf(ts_in, ts_out, navgs=5, coh_limit=0.6, freq_limit=0.02,
+                      method='multi', overlap=0.5, window='hamming'):
+    """
+    Compute the delay between two sets of timeseries using transfer function
+    phase. Unlike the cross-correlation approach in compute_delays, this method
+    allows for sub-sample delay estimation.
+
+    Parameters
+    ----------
+    ts_in : pd.Series or pd.DataFrame
+        The input (reference) timeseries. Index must be datetime.
+    ts_out : pd.Series or pd.DataFrame
+        The output timeseries. When ts_in is a single column and ts_out has
+        multiple columns, delays are computed between ts_in and each column of
+        ts_out. When both have the same number of columns, delays are computed
+        pairwise. Mismatched multi-column inputs (N columns vs M columns,
+        N ≠ M, both > 1) are not supported.
+    navgs : int
+        Number of averages for the transfer function computation. Controls
+        both frequency resolution and smoothing. Default is 5.
+        See signalproc.averaged_tf for more information.
+    coh_limit : float
+        Minimum coherence required for a frequency bin to be used in the delay
+        estimate. Default is 0.6.
+        See signalproc.tf_delay for more information.
+    freq_limit : float
+        Maximum frequency (Hz) used when fitting for the delay. Default is
+        0.02. See signalproc.tf_delay for more information.
+    method : str
+        Method for computing the delay. Options are:
+
+            `fit`:
+                Loop over each pair and fit a line to the unwrapped TF phase.
+            `multi`:
+                Fit all pairs simultaneously via least squares. Faster than
+                `fit` when many pairs are present.
+
+        Default is 'multi'.
+    overlap : float
+        Fractional overlap between averaging windows. Default is 0.5.
+        See signalproc.averaged_tf for more information.
+    window : str
+        Window type for spectral averaging. Default is 'hamming'.
+        See signalproc.averaged_tf for more information.
+
+    Returns
+    -------
+    delay : np.ndarray
+        Time delays in seconds between each ts_in/ts_out pair. Can be
+        non-integer multiples of the sampling period.
+    extras : dict
+        Additional data about the computation. Values are:
+
+        'mean_coh' - mean coherence within freq_limit for each pair, analogous
+                     to peak_corr in compute_delays. Higher values indicate
+                     a more reliable delay estimate.
+        'ix' - boolean mask array indicating which frequency bins were used
+               in the delay fit (shape: n_freqs x n_pairs).
+    """
+    n_in = 1 if isinstance(ts_in, pd.Series) else ts_in.shape[1]
+    n_out = 1 if isinstance(ts_out, pd.Series) else ts_out.shape[1]
+    if n_in > 1 and n_out > 1 and n_in != n_out:
+        raise ValueError(
+            f"ts_in has {n_in} columns and ts_out has {n_out} columns. "
+            "Both must have the same number of columns for pairwise computation, "
+            "or one must be a single column."
+        )
+
+    tf, tfcoh = averaged_tf(ts_in, ts_out, navgs=navgs, overlap=overlap,
+                            window=window, detrend=None)
+
+    if method == 'fit':
+        delay = np.zeros(len(tf.columns))
+        ix_all = np.zeros_like(tfcoh.values, dtype=bool)
+        for i, col in enumerate(tf.columns):
+            delay[i], ix = tf_delay(tf[col], tfcoh[col],
+                                    coh_limit=coh_limit,
+                                    freq_limit=freq_limit,
+                                    method='fit')
+            ix_all[:, i] = ix.flatten()
+
+    elif method == 'multi':
+        delay, ix_all = tf_delay(tf, tfcoh, coh_limit=coh_limit,
+                                 freq_limit=freq_limit, method='multi')
+    else:
+        raise ValueError(f'Invalid method: {method}')
+
+    freq_ix = tf.index < freq_limit
+    mean_coh = (np.nansum(tfcoh.values[freq_ix, :], axis=0)
+                / np.nansum(freq_ix))
+
+    extras = {
+        'mean_coh': mean_coh,
+        'ix': ix_all,
+    }
 
     return delay, extras
 

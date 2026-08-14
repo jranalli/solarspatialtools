@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from scipy import signal
 from scipy.interpolate import interp1d
-from solarspatialtools.signalproc import averaged_psd, averaged_tf, interp_tf, tf_delay, xcorr_delay, apply_delay, correlation, compute_delays, _fftcorrelate
+from solarspatialtools.signalproc import averaged_psd, averaged_tf, interp_tf, tf_delay, xcorr_delay, apply_delay, correlation, compute_delays, _fftcorrelate, compute_delays_tf
 
 
 @pytest.fixture(params=[0, 0.2, -0.2, 0.4, -0.4, 1, -1])
@@ -472,3 +472,55 @@ def test_compute_delays(delay, compute_delays_modes):
     delays, _ = compute_delays(xsigs, ysigs, compute_delays_modes)
 
     assert np.allclose(delays, delay_ins)
+
+@pytest.fixture(params=["fit", "multi"])
+def delay_method(request):
+    return request.param
+
+@pytest.mark.parametrize("delay", [-5.0, -2.5, -0.5, 0.0, 0.5, 2.5, 5.0])
+def test_compute_delays_tf(delay, delay_method):
+    np.random.seed(2023)
+    # Create a simple sinusoidal signal with noise
+    fs = 500  # sample rate
+    T = 1000.0    # seconds
+    t = np.linspace(0, T, int(T*fs), endpoint=False)  # time variable
+
+    x = 0.5 * np.sin(2 * np.pi * 2 * t) + np.random.random(len(t))
+
+    # duplicate and shift the signal
+    y1 = np.roll(x, int(delay*fs))
+    y2 = np.roll(x, int(2*delay * fs))
+    y3 = np.roll(x, int(3*delay * fs))
+    y4 = np.roll(x, int(4*delay * fs))
+
+    df = pd.DataFrame(np.array([x,y1,y2,y3,y4]).T, index=pd.to_timedelta(t, 's'), columns=['x1','x2','x3','x4','x5'])
+    ref = 'x1'
+
+    delays, coh = compute_delays_tf(df[ref], df, navgs=5, coh_limit=0.6, freq_limit=1, method=delay_method)
+
+    assert (delays == approx([0, delay, 2*delay, 3*delay, 4*delay], abs=2e-3))
+
+
+def test_compute_delays_nan_tf(delay_method):
+    delay = 5
+    np.random.seed(2023)
+    # Create a simple sinusoidal signal with noise
+    fs = 500  # sample rate
+    T = 1000.0    # seconds
+    t = np.linspace(0, T, int(T*fs), endpoint=False)  # time variable
+
+    x = 0.5 * np.sin(2 * np.pi * 2 * t) + np.random.random(len(t))
+
+    # duplicate and shift the signal
+    y1 = np.roll(x, int(delay*fs))
+    y2 = np.roll(x, int(2*delay * fs))
+    y3 = np.roll(x, int(3*delay * fs))
+    y4 = np.nan * np.zeros_like(y3)
+
+    df = pd.DataFrame(np.array([x,y1,y2,y3,y4]).T, index=pd.to_timedelta(t, 's'), columns=['x1','x2','x3','x4','x5'])
+    ref = 'x1'
+
+    delays, coh = compute_delays_tf(df[ref], df, navgs=5, coh_limit=0.6, freq_limit=1, method=delay_method)
+
+    assert (delays[0:-1] == approx([0, delay, 2*delay, 3*delay], abs=2e-3))
+    assert np.isnan(delays[-1])
