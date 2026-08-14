@@ -150,6 +150,9 @@ def test_cmv_delay_backend_tf_artificial(theta_deg, velocity, mode):
     assert ang_diff == approx(0, abs=0.1, rel=0.01)
     assert dat_tf.corr_lag is not None
     assert dat_tf.corr_raw is not None
+    assert dat_tf.pair_coh is not None
+    assert len(dat_tf.pair_coh) == len(dat_tf.allpairs)
+    assert dat_xc.pair_coh is None
 
 
 def test_cmv_gagne_data():

@@ -49,6 +49,7 @@ class WindspeedData:
     corr_lag = None  # Max-lag cross-correlation
     allpairs = None  # Points used for windspeed measurement
     pair_lag = None  # Point-wise maximum lag
+    pair_coh = None  # Point-wise mean coherence (TF backend only)
     pair_dists = None  # Point-wise distance to reference in m
     wind_speed = None  # Wind speed in m/s
     wind_angle = None  # Wind dir in radians
@@ -361,6 +362,7 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
     outdata.flag = overall_flag
     outdata.pair_flag = pair_flags
     outdata.pair_lag = delay
+    outdata.pair_coh = extras.get('mean_coh', None)
     outdata.allpairs = pairs
     outdata.corr_raw = extras.get('zero_corr', None)
     outdata.corr_lag = corr_lag
