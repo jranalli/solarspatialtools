@@ -439,6 +439,55 @@ def test_averaged_tf_multiboth():
     assert np.allclose(tf, tf_loop, atol=1e-5)
     assert np.allclose(coh, coh_loop, atol=1e-5)
 
+
+def test_compute_delays_tf_xcorr_compatibility():
+    np.random.seed(2024)
+    n = 1000
+    idx = pd.date_range('2020-01-01', periods=n, freq='1s')
+    x = np.sin(2 * np.pi * 0.05 * np.arange(n)) + 0.2 * np.random.randn(n)
+    y = np.roll(x, 5)
+    z = np.roll(x, 9)
+    ts_in = pd.DataFrame({'a': x, 'b': x}, index=idx)
+    ts_out = pd.DataFrame({'a': y, 'b': z}, index=idx)
+
+    delay_tf, extras_tf = compute_delays_tf(ts_in, ts_out, navgs=5,
+                                           method='multi', compute_xcorr=True)
+    _, extras_xcorr = compute_delays(ts_in, ts_out, mode='loop', scaling='coeff')
+
+    assert set(['peak_corr', 'mean_corr', 'zero_corr']).issubset(extras_tf)
+    # assert np.allclose(extras_tf['peak_corr'], extras_xcorr['peak_corr']) # this won't be close due to alternate methodologies
+    assert np.allclose(extras_tf['mean_corr'], extras_xcorr['mean_corr'])
+    assert np.allclose(extras_tf['zero_corr'], extras_xcorr['zero_corr'])
+    assert delay_tf.shape == (2,)
+
+
+def test_compute_delays_tf_xcorr_at_tf_delay():
+    np.random.seed(2025)
+    n = 1200
+    idx = pd.date_range('2020-01-01', periods=n, freq='1s')
+    x = np.sin(2 * np.pi * 0.03 * np.arange(n)) + 0.25 * np.random.randn(n)
+    y = np.roll(x, 7)
+    z = np.roll(x, 13)
+    ts_in = pd.DataFrame({'a': x, 'b': x}, index=idx)
+    ts_out = pd.DataFrame({'a': y, 'b': z}, index=idx)
+
+    delay_tf, extras_tf = compute_delays_tf(
+        ts_in, ts_out, navgs=5, method='multi',
+        compute_xcorr=True)
+
+    dt = (idx[1] - idx[0]).total_seconds()
+    for i in range(2):
+        xcorr_i, lags_i = correlation(ts_in.iloc[:, i], ts_out.iloc[:, i],
+                                      scaling='coeff')
+        lags_sec = lags_i * dt
+        expected = np.interp(-delay_tf[i], lags_sec, xcorr_i,
+                             left=np.nan, right=np.nan)
+        assert extras_tf['peak_corr'][i] == approx(expected)
+        assert extras_tf['mean_corr'][i] == approx(np.mean(xcorr_i))
+        zero_ix = np.where(lags_sec == 0)[0].item()
+        assert extras_tf['zero_corr'][i] == approx(xcorr_i[zero_ix])
+
+
 @pytest.fixture(params=['loop', 'fft'])
 def compute_delays_modes(request):
     return request.param

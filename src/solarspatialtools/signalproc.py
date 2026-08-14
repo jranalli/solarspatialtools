@@ -711,7 +711,8 @@ def compute_delays(ts_in, ts_out, mode='loop', scaling='coeff'):
 
 
 def compute_delays_tf(ts_in, ts_out, navgs=5, coh_limit=0.6, freq_limit=0.02,
-                      method='multi', overlap=0.5, window='hamming'):
+                      method='multi', overlap=0.5, window='hamming',
+                      compute_xcorr=False):
     """
     Compute the delay between two sets of timeseries using transfer function
     phase. Unlike the cross-correlation approach in compute_delays, this method
@@ -754,6 +755,11 @@ def compute_delays_tf(ts_in, ts_out, navgs=5, coh_limit=0.6, freq_limit=0.02,
     window : str
         Window type for spectral averaging. Default is 'hamming'.
         See signalproc.averaged_tf for more information.
+    compute_xcorr : bool
+        If True, also compute the conventional cross-correlation QC metrics for
+        each pair using the raw signals. This is slower, but it preserves the
+        `peak_corr`, `mean_corr`, and `zero_corr` extras expected by the legacy
+        CMV QC workflow. Default is False.
 
     Returns
     -------
@@ -768,6 +774,13 @@ def compute_delays_tf(ts_in, ts_out, navgs=5, coh_limit=0.6, freq_limit=0.02,
                      a more reliable delay estimate.
         'ix' - boolean mask array indicating which frequency bins were used
                in the delay fit (shape: n_freqs x n_pairs).
+
+        If `compute_xcorr` is True, also includes the legacy cross-correlation
+        quality metrics from `compute_delays`: 'peak_corr', 'mean_corr', and
+        'zero_corr'. These are computed from the raw signals and are intended
+        primarily for compatibility with the CMV QC workflow. 'peak_corr' is
+        the xcorr value sampled at the TF-estimated delay rather than the
+        global xcorr maximum.
     """
     n_in = 1 if isinstance(ts_in, pd.Series) else ts_in.shape[1]
     n_out = 1 if isinstance(ts_out, pd.Series) else ts_out.shape[1]
@@ -805,6 +818,33 @@ def compute_delays_tf(ts_in, ts_out, navgs=5, coh_limit=0.6, freq_limit=0.02,
         'mean_coh': mean_coh,
         'ix': ix_all,
     }
+    if compute_xcorr:
+        ts_inm = pd.DataFrame(ts_in) if isinstance(ts_in, pd.Series) else ts_in
+        ts_outm = pd.DataFrame(ts_out) if isinstance(ts_out, pd.Series) else ts_out
+        n_pairs = max(n_in, n_out)
+        dt = (ts_inm.index[1] - ts_inm.index[0]).total_seconds()
+        peak_corr = np.full(n_pairs, np.nan, dtype=float)
+        mean_corr = np.full(n_pairs, np.nan, dtype=float)
+        zero_corr = np.full(n_pairs, np.nan, dtype=float)
+        for i in range(n_pairs):
+            i_in = 0 if n_in == 1 else i
+            i_out = 0 if n_out == 1 else i
+            xcorr_i, lags_i = correlation(ts_inm.iloc[:, i_in],
+                                          ts_outm.iloc[:, i_out],
+                                          scaling='coeff')
+            lags_sec = lags_i * dt
+            mean_corr[i] = np.mean(xcorr_i)
+            zero_lag_ind = np.where(lags_sec == 0)[0]
+            if len(zero_lag_ind) == 1:
+                zero_corr[i] = xcorr_i[zero_lag_ind[0]]
+            peak_corr[i] = np.interp(-delay[i], lags_sec, xcorr_i,
+                                     left=np.nan, right=np.nan)
+
+        extras.update({
+            'peak_corr': peak_corr,
+            'mean_corr': mean_corr,
+            'zero_corr': zero_corr,
+        })
 
     return delay, extras
 
