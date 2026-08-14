@@ -89,3 +89,6 @@ site itself.
 - Adjust dt calculations in `stats` package to use median.
 - # Version 0.5.4 - Aug 13, 2026
 - Bugfix for CMV calculation in `cmv` package to handle NaN correlation values.
+- # Version 0.5.5 - Aug 14, 2026
+- Add tf-based delay option to CMV.
+- Improve repr of Windspeeddata class. 

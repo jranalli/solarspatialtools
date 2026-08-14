@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from scipy import signal
 from scipy.interpolate import interp1d
-from solarspatialtools.signalproc import averaged_psd, averaged_tf, interp_tf, tf_delay, xcorr_delay, apply_delay, correlation, compute_delays, _fftcorrelate
+from solarspatialtools.signalproc import averaged_psd, averaged_tf, interp_tf, tf_delay, xcorr_delay, apply_delay, correlation, compute_delays, _fftcorrelate, compute_delays_tf
 
 
 @pytest.fixture(params=[0, 0.2, -0.2, 0.4, -0.4, 1, -1])
@@ -439,6 +439,55 @@ def test_averaged_tf_multiboth():
     assert np.allclose(tf, tf_loop, atol=1e-5)
     assert np.allclose(coh, coh_loop, atol=1e-5)
 
+
+def test_compute_delays_tf_xcorr_compatibility():
+    np.random.seed(2024)
+    n = 1000
+    idx = pd.date_range('2020-01-01', periods=n, freq='1s')
+    x = np.sin(2 * np.pi * 0.05 * np.arange(n)) + 0.2 * np.random.randn(n)
+    y = np.roll(x, 5)
+    z = np.roll(x, 9)
+    ts_in = pd.DataFrame({'a': x, 'b': x}, index=idx)
+    ts_out = pd.DataFrame({'a': y, 'b': z}, index=idx)
+
+    delay_tf, extras_tf = compute_delays_tf(ts_in, ts_out, navgs=5,
+                                           method='multi', compute_xcorr=True)
+    _, extras_xcorr = compute_delays(ts_in, ts_out, mode='loop', scaling='coeff')
+
+    assert set(['peak_corr', 'mean_corr', 'zero_corr']).issubset(extras_tf)
+    # assert np.allclose(extras_tf['peak_corr'], extras_xcorr['peak_corr']) # this won't be close due to alternate methodologies
+    assert np.allclose(extras_tf['mean_corr'], extras_xcorr['mean_corr'])
+    assert np.allclose(extras_tf['zero_corr'], extras_xcorr['zero_corr'])
+    assert delay_tf.shape == (2,)
+
+
+def test_compute_delays_tf_xcorr_at_tf_delay():
+    np.random.seed(2025)
+    n = 1200
+    idx = pd.date_range('2020-01-01', periods=n, freq='1s')
+    x = np.sin(2 * np.pi * 0.03 * np.arange(n)) + 0.25 * np.random.randn(n)
+    y = np.roll(x, 7)
+    z = np.roll(x, 13)
+    ts_in = pd.DataFrame({'a': x, 'b': x}, index=idx)
+    ts_out = pd.DataFrame({'a': y, 'b': z}, index=idx)
+
+    delay_tf, extras_tf = compute_delays_tf(
+        ts_in, ts_out, navgs=5, method='multi',
+        compute_xcorr=True)
+
+    dt = (idx[1] - idx[0]).total_seconds()
+    for i in range(2):
+        xcorr_i, lags_i = correlation(ts_in.iloc[:, i], ts_out.iloc[:, i],
+                                      scaling='coeff')
+        lags_sec = lags_i * dt
+        expected = np.interp(-delay_tf[i], lags_sec, xcorr_i,
+                             left=np.nan, right=np.nan)
+        assert extras_tf['peak_corr'][i] == approx(expected)
+        assert extras_tf['mean_corr'][i] == approx(np.mean(xcorr_i))
+        zero_ix = np.where(lags_sec == 0)[0].item()
+        assert extras_tf['zero_corr'][i] == approx(xcorr_i[zero_ix])
+
+
 @pytest.fixture(params=['loop', 'fft'])
 def compute_delays_modes(request):
     return request.param
@@ -472,3 +521,55 @@ def test_compute_delays(delay, compute_delays_modes):
     delays, _ = compute_delays(xsigs, ysigs, compute_delays_modes)
 
     assert np.allclose(delays, delay_ins)
+
+@pytest.fixture(params=["fit", "multi"])
+def delay_method(request):
+    return request.param
+
+@pytest.mark.parametrize("delay", [-5.0, -2.5, -0.5, 0.0, 0.5, 2.5, 5.0])
+def test_compute_delays_tf(delay, delay_method):
+    np.random.seed(2023)
+    # Create a simple sinusoidal signal with noise
+    fs = 500  # sample rate
+    T = 1000.0    # seconds
+    t = np.linspace(0, T, int(T*fs), endpoint=False)  # time variable
+
+    x = 0.5 * np.sin(2 * np.pi * 2 * t) + np.random.random(len(t))
+
+    # duplicate and shift the signal
+    y1 = np.roll(x, int(delay*fs))
+    y2 = np.roll(x, int(2*delay * fs))
+    y3 = np.roll(x, int(3*delay * fs))
+    y4 = np.roll(x, int(4*delay * fs))
+
+    df = pd.DataFrame(np.array([x,y1,y2,y3,y4]).T, index=pd.to_timedelta(t, 's'), columns=['x1','x2','x3','x4','x5'])
+    ref = 'x1'
+
+    delays, coh = compute_delays_tf(df[ref], df, navgs=5, coh_limit=0.6, freq_limit=1, method=delay_method)
+
+    assert (delays == approx([0, delay, 2*delay, 3*delay, 4*delay], abs=2e-3))
+
+
+def test_compute_delays_nan_tf(delay_method):
+    delay = 5
+    np.random.seed(2023)
+    # Create a simple sinusoidal signal with noise
+    fs = 500  # sample rate
+    T = 1000.0    # seconds
+    t = np.linspace(0, T, int(T*fs), endpoint=False)  # time variable
+
+    x = 0.5 * np.sin(2 * np.pi * 2 * t) + np.random.random(len(t))
+
+    # duplicate and shift the signal
+    y1 = np.roll(x, int(delay*fs))
+    y2 = np.roll(x, int(2*delay * fs))
+    y3 = np.roll(x, int(3*delay * fs))
+    y4 = np.nan * np.zeros_like(y3)
+
+    df = pd.DataFrame(np.array([x,y1,y2,y3,y4]).T, index=pd.to_timedelta(t, 's'), columns=['x1','x2','x3','x4','x5'])
+    ref = 'x1'
+
+    delays, coh = compute_delays_tf(df[ref], df, navgs=5, coh_limit=0.6, freq_limit=1, method=delay_method)
+
+    assert (delays[0:-1] == approx([0, delay, 2*delay, 3*delay], abs=2e-3))
+    assert np.isnan(delays[-1])

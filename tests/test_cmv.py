@@ -7,6 +7,18 @@ import pandas as pd
 from solarspatialtools import cmv
 
 
+def test_windspeeddata_repr_as_dict():
+    dat = cmv.WindspeedData()
+    dat.wind_speed = 12.3
+    dat.corr_lag = np.array([0.9, 0.8])
+
+    dat_dict = dat.to_dict()
+    assert isinstance(dat_dict, dict)
+    assert dat_dict['wind_speed'] == 12.3
+    assert np.allclose(dat_dict['corr_lag'], np.array([0.9, 0.8]))
+    assert repr(dat) == repr(dat_dict)
+
+
 @pytest.fixture(params=[0, 45, 60, -60, 90, 124.5, 340.5])
 def theta_deg(request):
     return request.param
@@ -94,6 +106,65 @@ def test_cmv_artificial(theta_deg, velocity, mode):
     # Directions sometimes get wonky near the 0/360 boundary
     assert (cld_dir == approx(theta, rel=0.01) or
             cld_dir == approx(theta+2*np.pi, rel=0.01))
+
+
+def test_cmv_delay_backend_tf_artificial(theta_deg, velocity, mode):
+    pos_utm = pd.DataFrame(index=range(9), columns=['E', 'N'], dtype=float)
+    spacing = 10.0
+    pos_utm.loc[0] = [-spacing, -spacing]
+    pos_utm.loc[1] = [0.0, -spacing]
+    pos_utm.loc[2] = [spacing, -spacing]
+    pos_utm.loc[3] = [-spacing, 0.0]
+    pos_utm.loc[4] = [0.0, 0.0]
+    pos_utm.loc[5] = [spacing, 0.0]
+    pos_utm.loc[6] = [-spacing, spacing]
+    pos_utm.loc[7] = [0.0, spacing]
+    pos_utm.loc[8] = [spacing, spacing]
+
+    theta = np.deg2rad(theta_deg)
+
+    delays = np.zeros(9)
+    delays[4] = 0
+    delays[5] = spacing*np.cos(theta)/velocity
+    delays[7] = spacing*np.sin(theta)/velocity
+    delays[3] = -spacing*np.cos(theta)/velocity
+    delays[1] = -spacing*np.sin(theta)/velocity
+    delays[8] = spacing*np.sqrt(2)*np.cos(theta-45*np.pi/180)/velocity
+    delays[2] = -spacing*np.sqrt(2)*np.sin(theta-45*np.pi/180)/velocity
+    delays[6] = spacing*np.sqrt(2)*np.sin(theta-45*np.pi/180)/velocity
+    delays[0] = -spacing*np.sqrt(2)*np.cos(theta-45*np.pi/180)/velocity
+
+    fs = 10  # sample rate
+    T = 10000.0  # total seconds
+    np.random.seed(2023)
+    t = np.linspace(0, T, int(T * fs), endpoint=False)  # time variable
+    noise = np.random.random(len(t)) / 5  # add broadband noise
+    x = 0.5 * np.sin(2 * np.pi * 2 * t) + noise  # noisy signal
+
+    # The individual signals are delayed versions of the original. Noise is
+    # shifted rather than regenerated to ensure broadband coherence.
+    signals = np.zeros((9, len(x)))
+    signals[4, :] = x
+    for i, delay in enumerate(delays):
+        signals[i, :] = np.roll(x, int(delay*fs))
+    df = pd.DataFrame(signals.T, index=pd.to_timedelta(t, 's'))
+
+    spd_xc, dir_xc, dat_xc = cmv.compute_cmv(df, pos_utm, reference_id=4,
+                                             method='jamaly',
+                                             delay_backend='xcorr')
+    spd_tf, dir_tf, dat_tf = cmv.compute_cmv(df, pos_utm, reference_id=4,
+                                             method='jamaly',
+                                             delay_backend='tf')
+
+    assert spd_tf == approx(spd_xc, abs=0.1, rel=0.01)
+    ang_diff = np.abs(np.arctan2(np.sin(dir_tf - dir_xc),
+                                 np.cos(dir_tf - dir_xc)))
+    assert ang_diff == approx(0, abs=0.1, rel=0.01)
+    assert dat_tf.corr_lag is not None
+    assert dat_tf.corr_raw is not None
+    assert dat_tf.pair_coh is not None
+    assert len(dat_tf.pair_coh) == len(dat_tf.allpairs)
+    assert dat_xc.pair_coh is None
 
 
 def test_cmv_gagne_data():
