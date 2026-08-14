@@ -57,6 +57,27 @@ class WindspeedData:
     flag = None  # A data quality flag
     method_data = None  # A holder for method-specific data
 
+    _fields = (
+        'corr_raw',
+        'corr_lag',
+        'allpairs',
+        'pair_lag',
+        'pair_coh',
+        'pair_dists',
+        'wind_speed',
+        'wind_angle',
+        'pair_flag',
+        'flag',
+        'method_data',
+    )
+
+    def to_dict(self):
+        """Return WindspeedData members as a dictionary."""
+        return {field: getattr(self, field, None) for field in self._fields}
+
+    def __repr__(self):
+        return repr(self.to_dict())
+
 
 def _get_pairs(all_points, must_contain=None, replacement=True):
     """

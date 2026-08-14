@@ -7,6 +7,18 @@ import pandas as pd
 from solarspatialtools import cmv
 
 
+def test_windspeeddata_repr_as_dict():
+    dat = cmv.WindspeedData()
+    dat.wind_speed = 12.3
+    dat.corr_lag = np.array([0.9, 0.8])
+
+    dat_dict = dat.to_dict()
+    assert isinstance(dat_dict, dict)
+    assert dat_dict['wind_speed'] == 12.3
+    assert np.allclose(dat_dict['corr_lag'], np.array([0.9, 0.8]))
+    assert repr(dat) == repr(dat_dict)
+
+
 @pytest.fixture(params=[0, 45, 60, -60, 90, 124.5, 340.5])
 def theta_deg(request):
     return request.param
