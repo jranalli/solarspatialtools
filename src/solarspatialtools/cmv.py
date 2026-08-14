@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.optimize import minimize_scalar, leastsq
 
-from solarspatialtools.signalproc import compute_delays
+from solarspatialtools.signalproc import compute_delays, compute_delays_tf
 from solarspatialtools.spatial import project_vectors, compute_vectors
 from solarspatialtools.spatial import pol2rect, magnitude, dot
 
@@ -109,7 +109,7 @@ def _get_pairs(all_points, must_contain=None, replacement=True):
 
 
 def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
-                options=None):
+                options=None, delay_backend='xcorr'):
     """
     Find Cloud Motion Vector based on clear sky index timeseries from a cluster
     of sensors.
@@ -158,6 +158,15 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
                     Minimum permissible correlation coefficient for site pairs
             Gagne:
                 No method specific options
+    delay_backend : str (default 'xcorr')
+        Delay estimation backend. Options are:
+            'xcorr':
+                Uses cross-correlation to estimate delay and QC metrics.
+            'tf':
+                Uses transfer-function phase for delay estimation with fixed
+                settings (navgs=5, coh_limit=0.6, freq_limit=0.02,
+                method='multi', overlap=0.5, window='hamming'), and computes
+                cross-correlation QC metrics at the TF-estimated delay.
 
     Returns
     -------
@@ -186,6 +195,9 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
     method = method.lower()
     if method not in methods:
         raise ValueError('Method must be one of: ' + str(methods) + '.')
+    delay_backend = delay_backend.lower()
+    if delay_backend not in ['xcorr', 'tf']:
+        raise ValueError("delay_backend must be one of: ['xcorr', 'tf'].")
 
     # Ignore some numpy printouts, we'll deal with them manually
     np.seterr(divide='ignore')
@@ -217,9 +229,14 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
     A = ts[pairs[:, 0]]
     B = ts[pairs[:, 1]]
 
-    # We always need to calculate the correlations using correlation coeff.
-    # scaling, because it matters for various QC checks.
-    delay, extras = compute_delays(A, B, 'loop', scaling='coeff')
+    # We always need correlation-coefficient QC metrics for pairwise QC.
+    if delay_backend == 'xcorr':
+        delay, extras = compute_delays(A, B, 'loop', scaling='coeff')
+    else:
+        delay, extras = compute_delays_tf(A, B, navgs=5, coh_limit=0.6,
+                                          freq_limit=0.02, method='multi',
+                                          overlap=0.5, window='hamming',
+                                          compute_xcorr=True)
     corr_lag = extras['peak_corr']
     corr_mean = extras['mean_corr']
 
@@ -345,6 +362,7 @@ def compute_cmv(timeseries, positions, reference_id=None, method="jamaly",
     outdata.pair_flag = pair_flags
     outdata.pair_lag = delay
     outdata.allpairs = pairs
+    outdata.corr_raw = extras.get('zero_corr', None)
     outdata.corr_lag = corr_lag
     outdata.pair_dists = cmv_dir_dist
     outdata.wind_angle = cmv_theta
